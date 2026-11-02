@@ -18,6 +18,7 @@ import '../../../shared/providers/repository_providers.dart';
 import '../application/room_devices_controller.dart';
 import 'widgets/control_panel_device_card.dart';
 import 'widgets/device_control_card.dart';
+import 'widgets/ems_room_card.dart';
 import 'widgets/smart_led_device_card.dart';
 import 'widgets/room_summary_grid.dart';
 
@@ -41,14 +42,17 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
   /// shows the values just read from the device or Supabase.
   int _ledRefreshGeneration = 0;
 
+  /// Counts 1-second ticks so EMS samples refresh about every 5 seconds.
+  int _emsPollTicks = 0;
+
   @override
   void initState() {
     super.initState();
     _poll = Timer.periodic(const Duration(seconds: 1), (_) => _pollTick());
   }
 
-  /// Reloads Smart LED data while this room is the front route and the last
-  /// read has finished, so requests do not stack.
+  /// Reloads Smart LED data every second and EMS samples about every 5 seconds,
+  /// and only after the previous read has finished.
   void _pollTick() {
     if (!mounted) return;
     final route = ModalRoute.of(context);
@@ -58,16 +62,55 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
     if (devicesAsync.isLoading) return;
     final devices = devicesAsync.value;
     if (devices == null) return;
+
     final lights = [
       for (final device in devices)
         if (device.type == DeviceType.light) device,
     ];
-    if (lights.isEmpty) return;
-    for (final device in lights) {
-      final strips = smartLedStripsProvider(device.id);
-      if (ref.exists(strips) && ref.read(strips).isLoading) return;
+    final monitors = [
+      for (final device in devices)
+        if (device.type == DeviceType.environmentMonitor) device,
+    ];
+    if (lights.isEmpty && monitors.isEmpty) return;
+
+    if (lights.isNotEmpty && !_lightsBusy(lights)) {
+      ref.invalidate(roomDevicesControllerProvider(widget.roomId));
+      _refreshLights(lights);
     }
-    _refresh();
+
+    if (monitors.isEmpty) return;
+    _emsPollTicks++;
+    if (_emsPollTicks < 5) return;
+    if (_monitorsBusy(monitors)) return;
+    _emsPollTicks = 0;
+    for (final device in monitors) {
+      ref.invalidate(emsSensorProvider(device.id));
+    }
+  }
+
+  bool _lightsBusy(List<Device> devices) {
+    for (final device in devices) {
+      final strips = smartLedStripsProvider(device.id);
+      if (ref.exists(strips) && ref.read(strips).isLoading) return true;
+    }
+    return false;
+  }
+
+  bool _monitorsBusy(List<Device> devices) {
+    for (final device in devices) {
+      final reading = emsSensorProvider(device.id);
+      if (ref.exists(reading) && ref.read(reading).isLoading) return true;
+    }
+    return false;
+  }
+
+  void _refreshLights(List<Device> lights) {
+    final resolver = ref.read(deviceEndpointResolverProvider);
+    for (final device in lights) {
+      resolver.invalidate(device.id);
+      ref.invalidate(smartLedStripsProvider(device.id));
+    }
+    setState(() => _ledRefreshGeneration++);
   }
 
   void _refresh() {
@@ -75,14 +118,17 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
     final devices = ref.read(roomDevicesControllerProvider(id)).value;
     ref.invalidate(roomDevicesControllerProvider(id));
     if (devices != null) {
-      final resolver = ref.read(deviceEndpointResolverProvider);
+      final lights = [
+        for (final device in devices)
+          if (device.type == DeviceType.light) device,
+      ];
+      if (lights.isNotEmpty) _refreshLights(lights);
       for (final device in devices) {
-        if (device.type != DeviceType.light) continue;
-        resolver.invalidate(device.id);
-        ref.invalidate(smartLedStripsProvider(device.id));
+        if (device.type != DeviceType.environmentMonitor) continue;
+        ref.invalidate(emsSensorProvider(device.id));
       }
     }
-    setState(() => _ledRefreshGeneration++);
+    _emsPollTicks = 0;
   }
 
   @override
@@ -168,6 +214,15 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
                   for (final device in devices) ...[
                     if (device.type == DeviceType.controlPanel)
                       ControlPanelDeviceCard(
+                        device: device,
+                        onOpenDetails: () =>
+                            context.push(Paths.deviceDetails(device.id)),
+                        onOpenSettings: () =>
+                            context.push(Paths.deviceSettings(device.id)),
+                      )
+                    else if (device.type == DeviceType.environmentMonitor)
+                      EmsRoomCard(
+                        key: ValueKey(device.id),
                         device: device,
                         onOpenDetails: () =>
                             context.push(Paths.deviceDetails(device.id)),

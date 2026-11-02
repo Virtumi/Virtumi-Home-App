@@ -40,7 +40,9 @@ class DeviceSetupRepository {
 
     final hostTrim = selectedDevice.hostname.trim();
     final typeTrim = selectedDevice.devicetype.trim();
+    final isEms = isEmsTypeName(typeTrim);
     final dnTrim = selectedDevice.devicename.trim();
+    final storedName = isEms ? emsStoredName : loc.deviceName;
 
     final descriptionParts = connectionMode == 'direct'
         ? [
@@ -58,8 +60,8 @@ class DeviceSetupRepository {
         .from('devices')
         .insert({
           'user_id': userId,
-          'name': loc.deviceName,
-          'devicename': loc.deviceName,
+          'name': storedName,
+          'devicename': storedName,
           'hostname': hostTrim.isNotEmpty ? hostTrim : null,
           'ip_address': selectedDevice.ipAddress.isNotEmpty
               ? selectedDevice.ipAddress
@@ -88,7 +90,9 @@ class DeviceSetupRepository {
       final floorId = await _findOrCreateFloor(homeId, loc.floorName, dnTrim);
       final roomId = await _findOrCreateRoom(floorId, loc.roomName, dnTrim);
 
-      final deviceTypeName = typeTrim.isNotEmpty ? typeTrim : 'Control Panel';
+      final deviceTypeName = isEms
+          ? emsStoredName
+          : (typeTrim.isNotEmpty ? typeTrim : 'Control Panel');
 
       final deviceType = await _client
           .from('device_types')
@@ -113,7 +117,7 @@ class DeviceSetupRepository {
       final dlsPayload = {
         'device_id': deviceId,
         'user_id': userId,
-        'name': loc.deviceName,
+        'name': storedName,
         'home': loc.houseName,
         'floor': loc.floorName,
         'room': loc.roomName,
@@ -138,8 +142,8 @@ class DeviceSetupRepository {
       await _client
           .from('devices')
           .update({
-            'name': loc.deviceName,
-            'devicename': loc.deviceName,
+            'name': storedName,
+            'devicename': storedName,
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
           .eq('id', deviceId);

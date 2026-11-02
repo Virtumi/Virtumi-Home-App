@@ -20,9 +20,13 @@ class CpParameterCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
-  String get _title => parameter.name.isNotEmpty
-      ? parameter.name
-      : 'Parameter ${parameter.parameterIndex}';
+  String get _title {
+    final name = visibleStoredDeviceName(
+      parameter.name,
+      firmwareType: parameter.deviceType,
+    );
+    return name.isNotEmpty ? name : 'Parameter ${parameter.parameterIndex}';
+  }
 
   String get _status => parameter.enabled == 1 ? 'Aktiv' : 'Deaktiviert';
 

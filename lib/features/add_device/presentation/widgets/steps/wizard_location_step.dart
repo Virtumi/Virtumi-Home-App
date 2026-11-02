@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/theme.dart';
+import '../../../../../shared/models/models.dart';
 import '../../../../devices/presentation/widgets/settings_forms/device_location_form.dart';
 import '../../../application/new_device_wizard_controller.dart';
 import '../../../application/new_device_wizard_state.dart';
@@ -22,6 +23,7 @@ class WizardLocationStep extends StatelessWidget {
 
     return DeviceLocationForm(
       location: location,
+      lockDeviceName: isEmsTypeName(state.selectedDevice?.devicetype),
       enabled: true,
       onChanged: controller.updateDeviceLocation,
       footer: Padding(

@@ -14,12 +14,16 @@ class DeviceLocationForm extends StatefulWidget {
     required this.enabled,
     required this.onChanged,
     this.footer,
+    this.lockDeviceName = false,
   });
 
   final DeviceLocation location;
   final bool enabled;
   final ValueChanged<DeviceLocation> onChanged;
   final Widget? footer;
+
+  /// EMS keeps the stored name `EMS` and shows the long display name.
+  final bool lockDeviceName;
 
   @override
   State<DeviceLocationForm> createState() => _DeviceLocationFormState();
@@ -63,7 +67,8 @@ class _DeviceLocationFormState extends State<DeviceLocationForm> {
   }
 
   bool _matchesControllers(DeviceLocation loc) {
-    return loc.deviceName == _deviceName.text.trim() &&
+    final shownName = _nameLocked ? emsDisplayName : loc.deviceName;
+    return shownName == _deviceName.text.trim() &&
         loc.houseName == _house.text.trim() &&
         loc.houseIconKey == _houseIconKey &&
         loc.floorName == _floor.text.trim() &&
@@ -73,9 +78,12 @@ class _DeviceLocationFormState extends State<DeviceLocationForm> {
         loc.note == widget.location.note;
   }
 
+  bool get _nameLocked =>
+      widget.lockDeviceName || isEmsStoredName(widget.location.deviceName);
+
   void _applyLocation(DeviceLocation loc) {
     _withoutEmit(() {
-      _deviceName.text = loc.deviceName;
+      _deviceName.text = _nameLocked ? emsDisplayName : loc.deviceName;
       _house.text = loc.houseName;
       _floor.text = loc.floorName;
       _room.text = loc.roomName;
@@ -98,7 +106,7 @@ class _DeviceLocationFormState extends State<DeviceLocationForm> {
   void _emit() {
     widget.onChanged(
       widget.location.copyWith(
-        deviceName: _deviceName.text.trim(),
+        deviceName: _nameLocked ? emsStoredName : _deviceName.text.trim(),
         houseName: _house.text.trim(),
         houseIconKey: _houseIconKey,
         floorName: _floor.text.trim(),
@@ -138,10 +146,10 @@ class _DeviceLocationFormState extends State<DeviceLocationForm> {
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: LocationNameInput(
-                icon: Symbols.tablet,
+                icon: _nameLocked ? Symbols.air : Symbols.tablet,
                 iconColor: p.accentBlue,
                 controller: _deviceName,
-                enabled: widget.enabled,
+                enabled: widget.enabled && !_nameLocked,
                 hint: 'z. B. My Control Panel',
               ),
             ),

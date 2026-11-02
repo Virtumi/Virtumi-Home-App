@@ -44,9 +44,15 @@ class DeviceInfoPage extends ConsumerWidget {
           }
 
           final udpInfo = udpInfoAsync?.value;
-          final name = udpInfo?['devicename']?.toString() ?? device.name;
-          final typeLabel =
-              udpInfo?['devicetype']?.toString() ?? device.type.label;
+          final udpType = udpInfo?['devicetype']?.toString();
+          final isEms = device.type == DeviceType.environmentMonitor ||
+              isEmsTypeName(udpType);
+          final name = isEms
+              ? emsDisplayName
+              : (udpInfo?['devicename']?.toString() ?? device.displayName);
+          final typeLabel = isEms
+              ? emsDisplayName
+              : (udpType ?? device.type.label);
           final hostname = udpInfo?['hostname']?.toString() ?? device.hostname;
           final ip = udpInfo?['ip_address']?.toString() ?? device.ipAddress;
           final mac = udpInfo?['mac_address']?.toString() ?? device.macAddress;

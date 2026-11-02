@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 /// High-level category of a smart device, used for iconography and grouping.
 enum DeviceType {
   controlPanel(Symbols.tablet, 'Control Panel'),
+  environmentMonitor(Symbols.air, 'Environment Monitoring System'),
   light(Symbols.lightbulb, 'Licht'),
   thermostat(Symbols.thermostat, 'Thermostat'),
   sensor(Symbols.sensors, 'Sensor'),

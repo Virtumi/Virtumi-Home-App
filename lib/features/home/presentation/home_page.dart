@@ -176,10 +176,11 @@ class _RecentActivitySection extends ConsumerWidget {
                 for (final entry in entries) ...[
                   NavTileCard(
                     icon: entry.device.type.icon,
-                    title: entry.device.name,
+                    title: entry.device.displayName,
                     detail: entry.locationPath,
-                    subtitle:
-                        '${entry.device.type.label} · ${entry.device.statusLabel}',
+                    subtitle: entry.device.type == DeviceType.environmentMonitor
+                        ? '$emsCategoryLabel · ${entry.device.connectivity.label}'
+                        : '${entry.device.type.label} · ${entry.device.statusLabel}',
                     accent: context.colors.primary,
                     onTap: () =>
                         context.push(Paths.deviceDetails(entry.device.id)),

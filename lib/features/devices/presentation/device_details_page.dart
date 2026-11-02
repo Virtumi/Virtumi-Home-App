@@ -14,6 +14,7 @@ import '../../../shared/providers/repository_providers.dart';
 import '../../rooms/presentation/widgets/control_panel_device_card.dart';
 import '../../rooms/presentation/widgets/device_control_card.dart';
 import '../../rooms/presentation/widgets/smart_led_device_card.dart';
+import 'widgets/ems_device_overview.dart';
 
 /// Device details ("Gerätedetails"): same interactive card as room overview.
 class DeviceDetailsPage extends ConsumerStatefulWidget {
@@ -31,6 +32,8 @@ class _DeviceDetailsPageState extends ConsumerState<DeviceDetailsPage> {
   /// Bumped on each refresh so [SmartLedDeviceCard] drops its optimistic
   /// state and shows the values just read from the device or Supabase.
   int _ledRefreshGeneration = 0;
+  int _emsPollTicks = 0;
+  int _emsHistoryTicks = 0;
 
   @override
   void initState() {
@@ -44,8 +47,8 @@ class _DeviceDetailsPageState extends ConsumerState<DeviceDetailsPage> {
     super.dispose();
   }
 
-  /// Reloads this Smart LED while the details route is in front and the last
-  /// read has finished. Other device types are left alone.
+  /// Reloads this Smart LED every second and an EMS about every 5 seconds
+  /// while the details route is in front and the last read has finished.
   void _pollTick() {
     if (!mounted) return;
     final route = ModalRoute.of(context);
@@ -54,10 +57,29 @@ class _DeviceDetailsPageState extends ConsumerState<DeviceDetailsPage> {
     final id = widget.deviceId;
     final deviceAsync = ref.read(deviceProvider(id));
     if (deviceAsync.isLoading) return;
-    if (deviceAsync.value?.type != DeviceType.light) return;
-    final strips = smartLedStripsProvider(id);
-    if (ref.exists(strips) && ref.read(strips).isLoading) return;
-    _refresh();
+    final type = deviceAsync.value?.type;
+    if (type == DeviceType.light) {
+      final strips = smartLedStripsProvider(id);
+      if (ref.exists(strips) && ref.read(strips).isLoading) return;
+      _refresh();
+      return;
+    }
+    if (type != DeviceType.environmentMonitor) return;
+    _emsPollTicks++;
+    _emsHistoryTicks++;
+    if (_emsHistoryTicks >= 60) {
+      final history = emsSensorHistoryProvider(id);
+      final historyBusy = ref.exists(history) && ref.read(history).isLoading;
+      if (!historyBusy) {
+        _emsHistoryTicks = 0;
+        ref.invalidate(emsSensorHistoryProvider(id));
+      }
+    }
+    if (_emsPollTicks < 5) return;
+    final reading = emsSensorProvider(id);
+    if (ref.exists(reading) && ref.read(reading).isLoading) return;
+    _emsPollTicks = 0;
+    ref.invalidate(emsSensorProvider(id));
   }
 
   void _refresh() {
@@ -70,6 +92,11 @@ class _DeviceDetailsPageState extends ConsumerState<DeviceDetailsPage> {
       // Cloud: smart_led_settings. Direct: UDP protocol 0 / reply 17.
       ref.invalidate(smartLedStripsProvider(id));
       setState(() => _ledRefreshGeneration++);
+    } else if (type == DeviceType.environmentMonitor) {
+      ref.invalidate(emsSensorProvider(id));
+      ref.invalidate(emsSensorHistoryProvider(id));
+      _emsPollTicks = 0;
+      _emsHistoryTicks = 0;
     }
   }
 
@@ -80,6 +107,7 @@ class _DeviceDetailsPageState extends ConsumerState<DeviceDetailsPage> {
     final showEdit =
         device != null &&
         device.type != DeviceType.controlPanel &&
+        device.type != DeviceType.environmentMonitor &&
         device.type != DeviceType.light;
 
     return AppScaffold(
@@ -126,16 +154,33 @@ class _DeviceDetailsPageState extends ConsumerState<DeviceDetailsPage> {
           }
           return AppScrollView(
             children: [
-              SectionHeaderCard(
-                title: device.name,
-                subtitle: device.type.label,
-                icon: device.type.icon,
-                filled: true,
-              ),
-              _DeviceControlCard(
-                device: device,
-                ledRefreshGeneration: _ledRefreshGeneration,
-              ),
+              if (device.type == DeviceType.environmentMonitor)
+                EmsDeviceOverview(device: device)
+              else ...[
+                SectionHeaderCard(
+                  title: device.displayName,
+                  subtitle: device.type.label,
+                  icon: device.type.icon,
+                  filled: true,
+                  trailing: device.type == DeviceType.controlPanel ||
+                          device.type == DeviceType.light
+                      ? NeumorphicIconButton(
+                          icon: Symbols.settings,
+                          iconColor: context.colors.onSurface,
+                          size: 40,
+                          iconSize: 20,
+                          tooltip: 'Geräteeinstellungen',
+                          onPressed: () => context.push(
+                            Paths.deviceSettings(device.id),
+                          ),
+                        )
+                      : null,
+                ),
+                _DeviceControlCard(
+                  device: device,
+                  ledRefreshGeneration: _ledRefreshGeneration,
+                ),
+              ],
             ],
           );
         },
@@ -159,8 +204,9 @@ class _DeviceControlCard extends ConsumerWidget {
       return ControlPanelDeviceCard(
         device: device,
         showDetailsButton: false,
+        showSettingsButton: false,
         onOpenDetails: () {},
-        onOpenSettings: () => context.push(Paths.deviceSettings(device.id)),
+        onOpenSettings: () {},
       );
     }
 
@@ -168,11 +214,12 @@ class _DeviceControlCard extends ConsumerWidget {
       return SmartLedDeviceCard(
         device: device,
         showDetailsButton: false,
+        showSettingsButton: false,
         showExtendedEffectControls: true,
         showOfflineStatus: false,
         refreshGeneration: ledRefreshGeneration,
         onOpenDetails: () {},
-        onOpenSettings: () => context.push(Paths.deviceSettings(device.id)),
+        onOpenSettings: () {},
       );
     }
 

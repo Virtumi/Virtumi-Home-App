@@ -12,17 +12,24 @@ class SupabaseDeviceConfigRepository implements DeviceConfigRepository {
 
   final SupabaseClient _client;
 
-  Future<bool> _isSmartLed(String deviceId) async {
+  Future<String?> _deviceTypeName(String deviceId) async {
     final row = await _client
         .from('devices')
         .select('device_types(name)')
         .eq('id', deviceId)
         .maybeSingle();
 
-    if (row == null) return false;
+    if (row == null) return null;
     final types = row['device_types'];
-    if (types is! Map<String, dynamic>) return false;
-    return isSmartLedTypeName(types['name'] as String?);
+    if (types is! Map<String, dynamic>) return null;
+    return types['name'] as String?;
+  }
+
+  Future<String> _generalSettingsTable(String deviceId) async {
+    final typeName = await _deviceTypeName(deviceId);
+    if (isSmartLedTypeName(typeName)) return 'smart_led_general_settings';
+    if (isEmsTypeName(typeName)) return 'ems_general_settings';
+    return 'cp_general_settings';
   }
 
   Future<Map<String, dynamic>?> _row(
@@ -194,8 +201,11 @@ class SupabaseDeviceConfigRepository implements DeviceConfigRepository {
     DeviceLocation location,
   ) async {
     final userId = requireUserId(_client);
+    final stored = isEmsTypeName(await _deviceTypeName(deviceId))
+        ? location.copyWith(deviceName: emsStoredName)
+        : location;
     await _client.from('device_location_settings').upsert(
-      deviceLocationPayload(deviceId, userId, location),
+      deviceLocationPayload(deviceId, userId, stored),
     );
   }
 
@@ -255,9 +265,7 @@ class SupabaseDeviceConfigRepository implements DeviceConfigRepository {
 
   @override
   Future<GeneralConfig> getGeneralConfig(String deviceId) async {
-    final smartLed = await _isSmartLed(deviceId);
-    final table =
-        smartLed ? 'smart_led_general_settings' : 'cp_general_settings';
+    final table = await _generalSettingsTable(deviceId);
     final row = await _row(table, deviceId);
     return mapGeneralConfig(row);
   }
@@ -265,16 +273,14 @@ class SupabaseDeviceConfigRepository implements DeviceConfigRepository {
   @override
   Future<void> saveGeneralConfig(String deviceId, GeneralConfig config) async {
     final userId = requireUserId(_client);
-    final smartLed = await _isSmartLed(deviceId);
-    final table =
-        smartLed ? 'smart_led_general_settings' : 'cp_general_settings';
+    final table = await _generalSettingsTable(deviceId);
     await _upsert(
       table,
       generalConfigPayload(
         deviceId,
         userId,
         config,
-        includeMode: !smartLed,
+        includeMode: table != 'smart_led_general_settings',
       ),
     );
   }

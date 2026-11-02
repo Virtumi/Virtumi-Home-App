@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/rooms/application/room_devices_controller.dart';
 import '../../core/services/preferences_service.dart';
+import '../../core/supabase/realtime_guard.dart';
+import '../../core/supabase/realtime_service.dart';
+import '../../core/supabase/supabase_client.dart';
 import '../application/recent_device_activity.dart';
 import '../application/recent_house_activity.dart';
 import '../domain/device_config_repository.dart';
 import '../domain/smart_home_repository.dart';
 import '../models/models.dart';
-import '../../core/supabase/supabase_client.dart';
 import 'repository_providers.dart';
 
 /// Refreshes Home tab lists (houses grid + recent activity).
@@ -180,6 +182,39 @@ final updateConfigProvider =
 final generalConfigProvider =
     FutureProvider.family<GeneralConfig, String>((ref, deviceId) {
   return ref.watch(deviceConfigRepositoryProvider).getGeneralConfig(deviceId);
+});
+
+/// Current EMS climate sample. Cloud mode also listens to `ems_sensordata`.
+final emsSensorProvider =
+    FutureProvider.family<EmsSensorReading?, String>((ref, deviceId) {
+  if (useSupabaseRealtimeRef(ref)) {
+    final service = RealtimeService(ref.watch(supabaseClientProvider));
+    service.subscribeToDeviceTable(
+      deviceId: deviceId,
+      table: 'ems_sensordata',
+      onChange: () {
+        if (ref.mounted) ref.invalidateSelf();
+      },
+    );
+    ref.onDispose(service.unsubscribeAll);
+  }
+  return ref.watch(emsSensorRepositoryProvider).getReading(deviceId);
+});
+
+/// Last 24 hours from `ems_sensordata_history`, independent of connection mode.
+final emsSensorHistoryProvider =
+    FutureProvider.family<List<EmsHistoryPoint>, String>((ref, deviceId) {
+  return ref.watch(emsHistoryRepositoryProvider).getLast24Hours(deviceId);
+});
+
+/// One chosen window from `ems_sensordata_history`, independent of connection mode.
+final emsSensorHistoryRangeProvider =
+    FutureProvider.family<EmsHistoryRange, EmsHistoryQuery>((ref, query) {
+  return ref.watch(emsHistoryRepositoryProvider).getRange(
+        query.deviceId,
+        start: query.start,
+        end: query.end,
+      );
 });
 
 final cpParametersProvider =

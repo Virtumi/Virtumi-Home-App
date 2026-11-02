@@ -163,7 +163,7 @@ class _StartScreenPickerPageState extends ConsumerState<StartScreenPickerPage> {
                         context,
                         settings,
                         Paths.deviceDetails(device.id),
-                        '${device.name} · Geräte-Übersicht',
+                        '${device.displayName} · Geräte-Übersicht',
                       ),
                     ),
                   ],
@@ -435,8 +435,10 @@ class _DevicesSelectList extends ConsumerWidget {
             for (final device in devices) ...[
               NavTileCard(
                 icon: device.type.icon,
-                title: device.name,
-                subtitle: device.type.label,
+                title: device.displayName,
+                subtitle: device.type == DeviceType.environmentMonitor
+                    ? emsCategoryLabel
+                    : device.type.label,
                 accent: context.colors.primary,
                 onTap: () => onSelectDevice(device),
               ),

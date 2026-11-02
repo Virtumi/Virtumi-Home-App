@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/cp_settings_repository.dart';
 import '../../domain/device_config_repository.dart';
 import '../../domain/device_request_repository.dart';
+import '../../domain/ems_sensor_repository.dart';
 import '../../domain/smart_led_repository.dart';
 import '../../models/models.dart';
 
@@ -49,6 +50,18 @@ SmartLedRepository connectionAwareSmartLedRepository(
   required SmartLedRepository direct,
 }) {
   return _ConnectionAwareSmartLedRepository(
+    isDirect: () => ref.read(isDirectConnectionProvider),
+    cloud: cloud,
+    direct: direct,
+  );
+}
+
+EmsSensorRepository connectionAwareEmsSensorRepository(
+  Ref ref, {
+  required EmsSensorRepository cloud,
+  required EmsSensorRepository direct,
+}) {
+  return _ConnectionAwareEmsSensorRepository(
     isDirect: () => ref.read(isDirectConnectionProvider),
     cloud: cloud,
     direct: direct,
@@ -272,4 +285,22 @@ class _ConnectionAwareSmartLedRepository implements SmartLedRepository {
   @override
   Future<void> deactivateTrigger(String deviceId, int parameterIndex) =>
       _repo.deactivateTrigger(deviceId, parameterIndex);
+}
+
+class _ConnectionAwareEmsSensorRepository implements EmsSensorRepository {
+  _ConnectionAwareEmsSensorRepository({
+    required bool Function() isDirect,
+    required this.cloud,
+    required this.direct,
+  }) : _isDirect = isDirect;
+
+  final bool Function() _isDirect;
+  final EmsSensorRepository cloud;
+  final EmsSensorRepository direct;
+
+  EmsSensorRepository get _repo => _isDirect() ? direct : cloud;
+
+  @override
+  Future<EmsSensorReading?> getReading(String deviceId) =>
+      _repo.getReading(deviceId);
 }

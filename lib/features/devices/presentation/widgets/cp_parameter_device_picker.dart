@@ -106,15 +106,22 @@ class _CpParameterDevicePickerSheet extends ConsumerWidget {
                           ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: IconBox(
-                              icon: CpDeviceType.isSmartLed(device.deviceType)
+                              icon: device.deviceType == CpDeviceType.ems
+                                  ? Symbols.air
+                                  : CpDeviceType.isSmartLed(device.deviceType)
                                   ? Symbols.lightbulb
                                   : Symbols.devices,
                               color: context.colors.primary,
                               size: AppSizes.iconBoxSm,
                             ),
-                            title: Text(device.name),
+                            title: Text(
+                              device.deviceType == CpDeviceType.ems ||
+                                      isEmsTypeName(device.deviceTypeName)
+                                  ? emsDisplayName
+                                  : device.name,
+                            ),
                             subtitle: Text(
-                              '${device.deviceTypeName} · ${device.code.isEmpty ? '—' : device.code}',
+                              '${device.deviceType == CpDeviceType.ems || isEmsTypeName(device.deviceTypeName) ? emsDisplayName : device.deviceTypeName} · ${device.code.isEmpty ? '—' : device.code}',
                             ),
                             trailing: const Icon(Symbols.chevron_right),
                             onTap: () => Navigator.of(context).pop(device),

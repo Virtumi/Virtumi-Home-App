@@ -9,6 +9,8 @@ const deviceIdTables = [
   'device_mqtt_settings',
   'device_location_settings',
   'cp_general_settings',
+  'ems_general_settings',
+  'ems_sensordata',
   'device_datetime_settings',
   'device_network_settings',
   'device_softap_details',

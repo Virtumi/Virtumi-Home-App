@@ -21,6 +21,8 @@ import '../data/supabase/supabase_cp_settings_repository.dart';
 import '../data/supabase/supabase_device_config_repository.dart';
 import '../data/supabase/supabase_device_data_repository.dart';
 import '../data/supabase/supabase_device_request_repository.dart';
+import '../data/supabase/supabase_ems_history_repository.dart';
+import '../data/supabase/supabase_ems_sensor_repository.dart';
 import '../data/supabase/supabase_smart_home_repository.dart';
 import '../data/supabase/supabase_smart_led_repository.dart';
 import '../data/supabase/supabase_user_repository.dart';
@@ -29,6 +31,7 @@ import '../data/udp/device_endpoint_resolver.dart';
 import '../data/udp/repositories/udp_cp_settings_repository.dart';
 import '../data/udp/repositories/udp_device_config_repository.dart';
 import '../data/udp/repositories/udp_device_request_repository.dart';
+import '../data/udp/repositories/udp_ems_sensor_repository.dart';
 import '../data/udp/repositories/udp_smart_led_repository.dart';
 import '../data/udp/udp_device_service.dart';
 import '../data/udp_device_discovery_repository.dart';
@@ -38,10 +41,12 @@ import '../domain/device_config_repository.dart';
 import '../domain/device_data_repository.dart';
 import '../domain/device_discovery_repository.dart';
 import '../domain/device_request_repository.dart';
+import '../domain/ems_sensor_repository.dart';
 import '../domain/location_repository.dart';
 import '../domain/smart_home_repository.dart';
 import '../domain/smart_led_repository.dart';
 import '../domain/user_repository.dart';
+
 /// Single shared in-memory store seed instance (tests / dev override).
 final mockStoreProvider = Provider<MockStore>((ref) => MockStore.instance);
 
@@ -144,6 +149,28 @@ final smartLedRepositoryProvider = Provider<SmartLedRepository>((ref) {
     inner,
     (deviceId) => _recordDeviceActivity(ref, deviceId),
   );
+});
+
+/// Environment Monitoring System climate samples.
+final emsSensorRepositoryProvider = Provider<EmsSensorRepository>((ref) {
+  final cloud =
+      SupabaseEmsSensorRepository(ref.watch(supabaseClientProvider));
+  final direct = UdpEmsSensorRepository(
+    ref.watch(udpDeviceServiceProvider),
+    ref.watch(deviceEndpointResolverProvider),
+  );
+  return connectionAwareEmsSensorRepository(
+    ref,
+    cloud: cloud,
+    direct: direct,
+  );
+});
+
+/// 24-hour EMS history. Supabase in both cloud and direct mode.
+final emsHistoryRepositoryProvider = Provider<SupabaseEmsHistoryRepository>((
+  ref,
+) {
+  return SupabaseEmsHistoryRepository(ref.watch(supabaseClientProvider));
 });
 
 /// Device sensor data and update status.

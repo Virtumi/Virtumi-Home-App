@@ -385,9 +385,11 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
     final device = await getDevice(deviceId);
     if (device == null) return;
 
-    final table = device.type == DeviceType.light
-        ? 'smart_led_general_settings'
-        : 'cp_general_settings';
+    final table = switch (device.type) {
+      DeviceType.light => 'smart_led_general_settings',
+      DeviceType.environmentMonitor => 'ems_general_settings',
+      _ => 'cp_general_settings',
+    };
 
     if (table == 'smart_led_general_settings') {
       await _client.from(table).upsert({
@@ -412,16 +414,31 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
   @override
   Future<void> updateDeviceName(String deviceId, String name) async {
     final userId = requireUserId(_client);
+    final storedName = await _storedDeviceName(deviceId, name);
     await _client.from('devices').update({
-      'name': name,
+      'name': storedName,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', deviceId);
 
     await _client.from('device_location_settings').upsert({
       'device_id': deviceId,
-      'name': name,
+      'name': storedName,
       'user_id': userId,
     }, onConflict: 'device_id');
+  }
+
+  Future<String> _storedDeviceName(String deviceId, String requested) async {
+    final row = await _client
+        .from('devices')
+        .select('device_types(name)')
+        .eq('id', deviceId)
+        .maybeSingle();
+    final types = row?['device_types'];
+    final typeName = types is Map<String, dynamic>
+        ? types['name'] as String?
+        : null;
+    if (isEmsTypeName(typeName)) return emsStoredName;
+    return requested;
   }
 
   @override

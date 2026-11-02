@@ -1,4 +1,5 @@
 import '../../shared/domain/smart_home_repository.dart';
+import '../../shared/models/models.dart';
 import 'app_routes.dart';
 
 /// Validates and resolves user-selected launch routes.
@@ -55,7 +56,9 @@ class StartRouteSupport {
         return room != null ? '${room.name} · Raum-Übersicht' : 'Home';
       case 'device':
         final device = await repo.getDevice(segments[2]);
-        return device != null ? '${device.name} · Geräte-Übersicht' : 'Home';
+        return device != null
+            ? '${device.displayName} · Geräte-Übersicht'
+            : 'Home';
       default:
         return 'Home';
     }

@@ -49,13 +49,24 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
   DeviceSetupRepository get _setup => ref.read(deviceSetupRepositoryProvider);
   SupabaseClient get _client => ref.read(supabaseClientProvider);
 
+  DeviceLocation _withStoredEmsName(
+    WizardFoundDevice device,
+    DeviceLocation location,
+  ) {
+    if (!isEmsTypeName(device.devicetype)) return location;
+    return location.copyWith(deviceName: emsStoredName);
+  }
+
   DeviceLocation _defaultLocation(WizardFoundDevice device) {
-    return deviceLocationDefaults(
-      deviceName: device.devicename,
+    final location = deviceLocationDefaults(
+      deviceName: isEmsTypeName(device.devicetype)
+          ? emsStoredName
+          : device.devicename,
       home: device.home.isNotEmpty ? device.home : 'Mein Zuhause',
       floor: device.floor.isNotEmpty ? device.floor : 'Erdgeschoss',
       room: device.room.isNotEmpty ? device.room : 'Wohnzimmer',
     );
+    return _withStoredEmsName(device, location);
   }
 
   Future<void> requestPermissions() async {
@@ -408,9 +419,10 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
       final loaded = mapDeviceLocation(json);
       state = state.copyWith(
         selectedDevice: selected,
-        deviceLocation: loaded.deviceName.isNotEmpty
-            ? loaded
-            : _defaultLocation(selected),
+        deviceLocation: _withStoredEmsName(
+          selected,
+          loaded.deviceName.isNotEmpty ? loaded : _defaultLocation(selected),
+        ),
         isBusy: false,
       );
     } catch (_) {
@@ -422,7 +434,12 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
   }
 
   void updateDeviceLocation(DeviceLocation location) {
-    state = state.copyWith(deviceLocation: location);
+    final device = state.selectedDevice;
+    state = state.copyWith(
+      deviceLocation: device == null
+          ? location
+          : _withStoredEmsName(device, location),
+    );
   }
 
   Future<void> saveLocationAndContinue() async {

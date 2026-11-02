@@ -39,8 +39,18 @@ class _CpParameterFormSheetState extends ConsumerState<CpParameterFormSheet> {
 
   String get _deviceLabel {
     final selected = _selectedDevice;
-    if (selected != null) return selected.name;
-    if (_draft.name.isNotEmpty) return _draft.name;
+    if (selected != null) {
+      final name = visibleStoredDeviceName(
+        selected.name,
+        firmwareType: selected.deviceType,
+      );
+      if (name.isNotEmpty) return name;
+    }
+    final draftName = visibleStoredDeviceName(
+      _draft.name,
+      firmwareType: _draft.deviceType,
+    );
+    if (draftName.isNotEmpty) return draftName;
     return 'Gerät auswählen';
   }
 

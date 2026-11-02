@@ -43,6 +43,7 @@ class AppRoute {
   static const String smartLedTriggers = 'smartLedTriggers';
   static const String deviceData = 'deviceData';
   static const String ledStripSettings = 'ledStripSettings';
+  static const String emsHistory = 'emsHistory';
 }
 
 /// Concrete path builders (absolute locations) for `context.go(...)`.
@@ -92,6 +93,8 @@ class Paths {
       '/home/device/$deviceId/led-triggers';
   static String deviceData(String deviceId) =>
       '/home/device/$deviceId/sensor-data';
+  static String emsHistory(String deviceId) =>
+      '/home/device/$deviceId/history';
   static String ledStripSettings(String deviceId) =>
       '/home/device/$deviceId/general/led-strip-settings';
 }

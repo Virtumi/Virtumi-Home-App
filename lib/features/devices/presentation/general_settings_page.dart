@@ -47,6 +47,12 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
         onChange: () =>
             ref.invalidate(generalConfigProvider(widget.deviceId)),
       );
+      _realtime!.subscribeToDeviceTable(
+        deviceId: widget.deviceId,
+        table: 'ems_general_settings',
+        onChange: () =>
+            ref.invalidate(generalConfigProvider(widget.deviceId)),
+      );
     });
   }
 

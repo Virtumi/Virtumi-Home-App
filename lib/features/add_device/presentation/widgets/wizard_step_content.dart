@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../../core/theme/theme.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../../shared/models/models.dart';
 import '../../application/new_device_wizard_controller.dart';
 import '../../application/new_device_wizard_state.dart';
 import '../../models/wizard_found_device.dart';
@@ -286,9 +287,14 @@ class _WizardStepContentState extends State<WizardStepContent> {
         for (final result in widget.state.scanResults)
           ListTile(
             leading: const Icon(Symbols.bluetooth),
-            title: Text(result.device.platformName.isNotEmpty
-                ? result.device.platformName
-                : 'Unbekanntes Gerät'),
+            title: Text(
+              isEmsTypeName(result.device.platformName) ||
+                      isEmsStoredName(result.device.platformName)
+                  ? emsDisplayName
+                  : (result.device.platformName.isNotEmpty
+                      ? result.device.platformName
+                      : 'Unbekanntes Gerät'),
+            ),
             subtitle: Text(result.device.remoteId.str),
             onTap: widget.state.isBusy
                 ? null
@@ -409,7 +415,11 @@ class _WizardStepContentState extends State<WizardStepContent> {
         if (device != null && loc != null) ...[
           ListTile(
             title: const Text('Name'),
-            subtitle: Text(loc.deviceName),
+            subtitle: Text(
+              isEmsTypeName(device.devicetype)
+                  ? emsDisplayName
+                  : loc.deviceName,
+            ),
           ),
           ListTile(title: const Text('IP'), subtitle: Text(device.ipAddress)),
           ListTile(title: const Text('MAC'), subtitle: Text(device.macAddress)),
@@ -473,7 +483,7 @@ class _WizardStepContentState extends State<WizardStepContent> {
     return SectionHeaderCard(
       title: 'Gerät erfolgreich hinzugefügt!',
       subtitle: loc != null
-          ? '${loc.deviceName} · ${loc.houseName} / ${loc.roomName}'
+          ? '${isEmsStoredName(loc.deviceName) || isEmsTypeName(widget.state.selectedDevice?.devicetype) ? emsDisplayName : loc.deviceName} · ${loc.houseName} / ${loc.roomName}'
           : 'Fertig',
       icon: Symbols.check_circle,
       accent: AppColors.accentGreen,
@@ -504,10 +514,17 @@ class _DiscoveredLanDeviceCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(device.devicename, style: context.text.titleSmall),
+          Text(
+            isEmsTypeName(device.devicetype)
+                ? emsDisplayName
+                : device.devicename,
+            style: context.text.titleSmall,
+          ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            '${device.devicetype} · ${device.ipAddress}',
+            isEmsTypeName(device.devicetype)
+                ? device.ipAddress
+                : '${device.devicetype} · ${device.ipAddress}',
             style: context.text.bodyMedium?.copyWith(
               color: context.colors.onSurfaceVariant,
             ),

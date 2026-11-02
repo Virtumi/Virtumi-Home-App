@@ -100,6 +100,7 @@ class DeviceSettingsPage extends ConsumerWidget {
     final device = deviceAsync.value;
     final isSmartLed = device?.type == DeviceType.light;
     final isControlPanel = device?.type == DeviceType.controlPanel;
+    final isEms = device?.type == DeviceType.environmentMonitor;
 
     final tiles = <SettingsGridTile>[
       SettingsGridTile(
@@ -141,7 +142,7 @@ class DeviceSettingsPage extends ConsumerWidget {
           onTap: () => context.push(Paths.smartLedTriggers(deviceId)),
         ),
       ],
-      if (!isControlPanel && !isSmartLed)
+      if (!isControlPanel && !isSmartLed && !isEms)
         SettingsGridTile(
           icon: Symbols.sensors,
           label: 'Sensor-\ndaten',
@@ -195,6 +196,7 @@ class DeviceSettingsPage extends ConsumerWidget {
 
     final showHeaderActions = device != null &&
         device.type != DeviceType.controlPanel &&
+        device.type != DeviceType.environmentMonitor &&
         device.type != DeviceType.light;
 
     return AppScaffold(

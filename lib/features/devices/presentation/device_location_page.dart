@@ -22,7 +22,11 @@ class _DeviceLocationPageState extends ConsumerState<DeviceLocationPage> {
   bool _editing = false;
 
   Future<void> _save(DeviceLocation base) async {
-    final updated = _draft ?? base;
+    final device = ref.read(deviceProvider(widget.deviceId)).value;
+    final draft = _draft ?? base;
+    final updated = device?.type == DeviceType.environmentMonitor
+        ? draft.copyWith(deviceName: emsStoredName)
+        : draft;
     await ref
         .read(deviceConfigRepositoryProvider)
         .saveDeviceLocation(widget.deviceId, updated);
@@ -49,6 +53,8 @@ class _DeviceLocationPageState extends ConsumerState<DeviceLocationPage> {
   @override
   Widget build(BuildContext context) {
     final locationAsync = ref.watch(deviceLocationProvider(widget.deviceId));
+    final lockName = ref.watch(deviceProvider(widget.deviceId)).value?.type ==
+        DeviceType.environmentMonitor;
 
     return AppScaffold(
       header: AppHeader(
@@ -67,6 +73,7 @@ class _DeviceLocationPageState extends ConsumerState<DeviceLocationPage> {
             children: [
               DeviceLocationForm(
                 location: display,
+                lockDeviceName: lockName,
                 enabled: _editing,
                 onChanged: (loc) => setState(() => _draft = loc),
                 footer: _editing

@@ -50,8 +50,12 @@ class DeviceParametersPage extends ConsumerWidget {
     WidgetRef ref,
     CpParameter parameter,
   ) async {
-    final title = parameter.name.isNotEmpty
-        ? parameter.name
+    final storedTitle = visibleStoredDeviceName(
+      parameter.name,
+      firmwareType: parameter.deviceType,
+    );
+    final title = storedTitle.isNotEmpty
+        ? storedTitle
         : 'Parameter ${parameter.parameterIndex}';
 
     final confirmed = await showDialog<bool>(

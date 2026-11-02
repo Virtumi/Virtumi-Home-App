@@ -14,6 +14,7 @@ import '../../features/devices/presentation/change_password_page.dart';
 import '../../features/devices/presentation/cloud_page.dart';
 import '../../features/devices/presentation/date_time_page.dart';
 import '../../features/devices/presentation/device_details_page.dart';
+import '../../features/devices/presentation/ems_history_page.dart';
 import '../../features/devices/presentation/device_info_page.dart';
 import '../../features/devices/presentation/device_location_page.dart';
 import '../../features/devices/presentation/device_settings_page.dart';
@@ -299,6 +300,11 @@ List<GoRoute> _deviceSettingRoutes() {
       path: 'sensor-data',
       name: AppRoute.deviceData,
       pageBuilder: (c, s) => slidePage(s, DeviceDataPage(deviceId: id(s))),
+    ),
+    GoRoute(
+      path: 'history',
+      name: AppRoute.emsHistory,
+      pageBuilder: (c, s) => slidePage(s, EmsHistoryPage(deviceId: id(s))),
     ),
   ];
 }

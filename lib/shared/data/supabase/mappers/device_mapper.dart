@@ -1,4 +1,5 @@
 import '../../../models/device.dart';
+import '../../../models/ems_device.dart';
 
 bool isSmartLedTypeName(String? typeName) {
   if (typeName == null || typeName.isEmpty) return false;
@@ -8,6 +9,7 @@ bool isSmartLedTypeName(String? typeName) {
 
 DeviceType mapDeviceType(String? typeName) {
   if (isSmartLedTypeName(typeName)) return DeviceType.light;
+  if (isEmsTypeName(typeName)) return DeviceType.environmentMonitor;
   if (typeName != null && typeName.toLowerCase().contains('control panel')) {
     return DeviceType.controlPanel;
   }

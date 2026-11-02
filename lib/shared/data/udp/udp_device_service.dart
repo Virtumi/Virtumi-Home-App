@@ -276,6 +276,35 @@ class UdpDeviceService {
     );
   }
 
+  /// Climate sample. Firmware expects protocol 10, not the generic read (0).
+  Future<Map<String, dynamic>> readEmsSensor({
+    required String targetIp,
+    required int port,
+    required String deviceCode,
+    Duration timeout = const Duration(seconds: 3),
+  }) {
+    return sendAndWait(
+      targetIp: targetIp,
+      port: port,
+      timeout: timeout,
+      expectedReplyProtocol: 10,
+      message: {
+        'protocol_nr': 10,
+        'reply_protocol': 10,
+        'code': deviceCode,
+      },
+      matches: (json) {
+        if (isBareReadRequestEcho(json, 10)) return false;
+        return json.containsKey('iaq') ||
+            json.containsKey('accuracy') ||
+            json.containsKey('raw_temperature') ||
+            json.containsKey('raw_pressure') ||
+            json.containsKey('raw_humidity') ||
+            json.containsKey('co2_equivalent');
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> readDeviceInfo({
     required String targetIp,
     required int port,
