@@ -61,12 +61,12 @@ class DateTimeConfig {
 @immutable
 class MatterConfig {
   const MatterConfig({
-    this.enabled = true,
-    this.paired = true,
-    this.setupCode = '3496-011-2345',
-    this.qrPayload = 'MT:Y.K9042S40916603838G00',
-    this.fabricCount = 2,
-    this.threadEnabled = true,
+    this.enabled = false,
+    this.paired = false,
+    this.setupCode = '',
+    this.qrPayload = '',
+    this.fabricCount = 0,
+    this.threadEnabled = false,
   });
 
   final bool enabled;
@@ -77,6 +77,10 @@ class MatterConfig {
   final String qrPayload;
   final int fabricCount;
   final bool threadEnabled;
+
+  /// True when the device provided a QR payload or a manual setup code.
+  bool get hasPairingData =>
+      qrPayload.trim().isNotEmpty || setupCode.trim().isNotEmpty;
 
   MatterConfig copyWith({
     bool? enabled,

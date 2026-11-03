@@ -112,32 +112,32 @@ class EmsDeviceOverview extends ConsumerWidget {
                   ),
                 ),
               ],
+              const SizedBox(height: AppSpacing.gutter),
+              Row(
+                children: [
+                  Expanded(
+                    child: _IndexTile(
+                      icon: Symbols.bubble_chart,
+                      color: context.palette.accentTeal,
+                      label: 'AQI Index',
+                      value: reading.aqiLabel,
+                      caption: 'Genauigkeit: ${reading.accuracyLabel}',
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _IndexTile(
+                      icon: Symbols.co2,
+                      color: context.palette.accentIndigo,
+                      label: 'Kohlendioxid',
+                      value: reading.co2Label,
+                      caption: reading.co2Ppm == null ? '—' : 'ppm',
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-        ),
-        const SizedBox(height: AppSpacing.cardGap),
-        Row(
-          children: [
-            Expanded(
-              child: _IndexTile(
-                icon: Symbols.bubble_chart,
-                color: context.palette.accentTeal,
-                label: 'AQI Index',
-                value: reading.aqiLabel,
-                caption: 'Genauigkeit: ${reading.accuracyLabel}',
-              ),
-            ),
-            const SizedBox(width: AppSpacing.cardGap),
-            Expanded(
-              child: _IndexTile(
-                icon: Symbols.co2,
-                color: context.palette.accentIndigo,
-                label: 'Kohlendioxid',
-                value: reading.co2Label,
-                caption: reading.co2Ppm == null ? '—' : 'ppm',
-              ),
-            ),
-          ],
         ),
         const SizedBox(height: AppSpacing.lg),
         const AppSectionLabel('Klimamesswerte'),
@@ -226,22 +226,46 @@ class _IndexTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.gutter),
+    return NeumorphicContainer(
+      style: NeumorphicStyle.sunken,
+      borderRadius: AppRadius.mdAll,
+      padding: const EdgeInsets.all(AppSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconBox(icon: icon, color: color, filled: true),
-          const SizedBox(height: AppSpacing.gutter),
-          Text(label, style: DeviceCardTextStyles.caption(context)),
+          Row(
+            children: [
+              IconBox(
+                icon: icon,
+                color: color,
+                size: 28,
+                iconSize: 16,
+                filled: true,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  label,
+                  style: DeviceCardTextStyles.caption(context),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             value,
-            style: context.text.headlineSmall?.copyWith(
+            style: context.text.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
-          Text(caption, style: DeviceCardTextStyles.subtitle(context)),
+          Text(
+            caption,
+            style: DeviceCardTextStyles.caption(context),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );

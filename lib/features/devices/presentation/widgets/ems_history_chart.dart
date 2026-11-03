@@ -9,6 +9,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/data_providers.dart';
 import '../../../rooms/presentation/widgets/device_card_text_styles.dart';
+import 'ems_metric_selector.dart';
 import 'ems_series_chart.dart';
 
 /// 24-hour climate chart for the air-quality device overview.
@@ -58,20 +59,9 @@ class _EmsHistoryChartState extends ConsumerState<EmsHistoryChart> {
             ],
           ),
           const SizedBox(height: AppSpacing.gutter),
-          Row(
-            children: [
-              for (final metric in EmsHistoryMetric.values) ...[
-                if (metric != EmsHistoryMetric.aqi)
-                  const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: _MetricChip(
-                    label: metric.label,
-                    selected: metric == _metric,
-                    onTap: () => setState(() => _metric = metric),
-                  ),
-                ),
-              ],
-            ],
+          EmsMetricSelector(
+            isSelected: (metric) => metric == _metric,
+            onSelected: (metric) => setState(() => _metric = metric),
           ),
           const SizedBox(height: AppSpacing.gutter),
           SizedBox(
@@ -86,48 +76,6 @@ class _EmsHistoryChartState extends ConsumerState<EmsHistoryChart> {
           const SizedBox(height: AppSpacing.sm),
           _AxisLabels(now: DateTime.now()),
         ],
-      ),
-    );
-  }
-}
-
-class _MetricChip extends StatelessWidget {
-  const _MetricChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final foreground = selected
-        ? context.colors.onPrimary
-        : context.colors.onSurfaceVariant;
-    return Material(
-      color: selected
-          ? context.colors.primary
-          : context.colors.surfaceContainerHighest,
-      borderRadius: AppRadius.full,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.full,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: context.text.labelMedium?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
       ),
     );
   }

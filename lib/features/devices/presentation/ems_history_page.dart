@@ -8,6 +8,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../rooms/presentation/widgets/device_card_text_styles.dart';
+import 'widgets/ems_metric_selector.dart';
 import 'widgets/ems_series_chart.dart';
 
 /// Interactive climate history for one Environment Monitoring System.
@@ -287,20 +288,9 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
             onLast24Hours: _applyLast24Hours,
           ),
           const SizedBox(height: AppSpacing.cardGap),
-          Row(
-            children: [
-              for (final metric in EmsHistoryMetric.values) ...[
-                if (metric != EmsHistoryMetric.aqi)
-                  const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: _MetricChip(
-                    label: metric.label,
-                    selected: _metrics.contains(metric),
-                    onTap: () => _toggleMetric(metric),
-                  ),
-                ),
-              ],
-            ],
+          EmsMetricSelector(
+            isSelected: _metrics.contains,
+            onSelected: _toggleMetric,
           ),
           const SizedBox(height: AppSpacing.gutter),
           Row(
@@ -681,48 +671,6 @@ class _WindowAxis extends StatelessWidget {
         ),
         Text(_formatAxis(end, span), style: style),
       ],
-    );
-  }
-}
-
-class _MetricChip extends StatelessWidget {
-  const _MetricChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final foreground = selected
-        ? context.colors.onPrimary
-        : context.colors.onSurfaceVariant;
-    return Material(
-      color: selected
-          ? context.colors.primary
-          : context.colors.surfaceContainerHighest,
-      borderRadius: AppRadius.full,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.full,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: context.text.labelMedium?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

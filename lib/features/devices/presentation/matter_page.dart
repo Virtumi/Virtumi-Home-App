@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/theme.dart';
@@ -106,21 +107,68 @@ class MatterPage extends ConsumerWidget {
                 imageAsset: AppConstants.matterLogoAsset,
                 accent: AppColors.accentCyan,
               ),
-              MatterPairingStatusCard(paired: config.paired),
+              if (config.hasPairingData)
+                MatterPairingStatusCard(paired: config.paired)
+              else
+                const _MatterMissingCard(),
               const SizedBox(height: AppSpacing.md),
               MatterActionCard(
                 onActivatePairing: () =>
                     _activatePairingMode(context, ref, config),
                 onFactoryReset: () => _factoryReset(context, ref, config),
               ),
-              const SizedBox(height: AppSpacing.md),
-              MatterQrPairingCard(
-                qrPayload: config.qrPayload,
-                setupCode: config.setupCode,
-              ),
+              if (config.hasPairingData) ...[
+                const SizedBox(height: AppSpacing.md),
+                MatterQrPairingCard(
+                  qrPayload: config.qrPayload,
+                  setupCode: config.setupCode,
+                ),
+              ],
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _MatterMissingCard extends StatelessWidget {
+  const _MatterMissingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = context.palette.accentAmber;
+    return AppCard(
+      child: Row(
+        children: [
+          IconBox(
+            icon: Symbols.warning,
+            color: color,
+            size: AppSizes.iconBoxMd,
+            filled: true,
+            glow: true,
+          ),
+          const SizedBox(width: AppSpacing.gutter),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Keine Matter-Daten vorhanden.',
+                  style: context.text.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+                Text(
+                  'QR-Code und Setup-Code fehlen.',
+                  style: context.text.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
