@@ -61,11 +61,6 @@ class EmsDeviceOverview extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'INDEX BEWERTUNG',
-                style: DeviceCardTextStyles.statLabel(context),
-              ),
-              const SizedBox(height: AppSpacing.gutter),
               Row(
                 children: [
                   Icon(
@@ -96,12 +91,20 @@ class EmsDeviceOverview extends ConsumerWidget {
               ],
               const SizedBox(height: AppSpacing.lg),
               EmsAirQualityScale(reading: reading),
-              if (reading.isStabilizing) ...[
+              if (reading.isStabilizing || reading.isRunInActive) ...[
                 const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Sensor stabilisiert sich noch.',
-                  style: DeviceCardTextStyles.caption(context),
-                ),
+                if (reading.isStabilizing)
+                  Text(
+                    'Sensor stabilisiert sich noch.',
+                    style: DeviceCardTextStyles.caption(context),
+                  ),
+                if (reading.isStabilizing && reading.isRunInActive)
+                  const SizedBox(height: AppSpacing.xs),
+                if (reading.isRunInActive)
+                  Text(
+                    'Sensor Einlaufphase aktiv',
+                    style: DeviceCardTextStyles.caption(context),
+                  ),
               ],
               if (readingAsync.hasError) ...[
                 const SizedBox(height: AppSpacing.sm),
@@ -113,15 +116,16 @@ class EmsDeviceOverview extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: AppSpacing.gutter),
-              Row(
-                children: [
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   Expanded(
                     child: _IndexTile(
                       icon: Symbols.bubble_chart,
                       color: context.palette.accentTeal,
                       label: 'AQI Index',
                       value: reading.aqiLabel,
-                      caption: 'Genauigkeit: ${reading.accuracyLabel}',
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -134,7 +138,18 @@ class EmsDeviceOverview extends ConsumerWidget {
                       caption: reading.co2Ppm == null ? '—' : 'ppm',
                     ),
                   ),
-                ],
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _IndexTile(
+                      icon: Symbols.air,
+                      color: context.palette.accentPurple,
+                      label: 'VOC',
+                      value: reading.vocLabel,
+                      caption: reading.breathVocEquivalent == null ? '—' : 'ppm',
+                    ),
+                  ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -215,7 +230,7 @@ class _IndexTile extends StatelessWidget {
     required this.color,
     required this.label,
     required this.value,
-    required this.caption,
+    this.caption = '',
   });
 
   final IconData icon;
@@ -230,6 +245,7 @@ class _IndexTile extends StatelessWidget {
       style: NeumorphicStyle.sunken,
       borderRadius: AppRadius.mdAll,
       padding: const EdgeInsets.all(AppSpacing.sm),
+      alignment: Alignment.topLeft,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -261,7 +277,7 @@ class _IndexTile extends StatelessWidget {
             ),
           ),
           Text(
-            caption,
+            caption.isEmpty ? '\u00A0' : caption,
             style: DeviceCardTextStyles.caption(context),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

@@ -25,7 +25,10 @@ class SupabaseEmsHistoryRepository {
   }) async {
     final rows = await _client
         .from('ems_sensordata_history')
-        .select('logged_at, iaq, raw_temperature, raw_humidity, raw_pressure')
+        .select(
+          'logged_at, static_iaq, sensor_heat_compensated_temperature, '
+          'sensor_heat_compensated_humidity, raw_pressure',
+        )
         .eq('device_id', deviceId)
         .neq('operation', 'DELETE')
         .gte('logged_at', _utcTimestamp(start))

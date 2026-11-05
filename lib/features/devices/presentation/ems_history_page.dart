@@ -45,6 +45,7 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
   final Set<EmsHistoryMetric> _metrics = {EmsHistoryMetric.aqi};
   _ChartFocus? _focus;
   bool _rangeError = false;
+  bool _followLatest = true;
 
   @override
   void initState() {
@@ -72,7 +73,7 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
     return floor;
   }
 
-  void _setVisible(DateTime start, DateTime end) {
+  (DateTime, DateTime) _clampVisible(DateTime start, DateTime end) {
     var nextStart = start;
     var nextEnd = end;
     final minSpan = _minSpan;
@@ -99,8 +100,52 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
       nextStart = _appliedStart;
       nextEnd = _appliedEnd;
     }
-    _visibleStart = nextStart;
-    _visibleEnd = nextEnd;
+    return (nextStart, nextEnd);
+  }
+
+  void _setVisible(DateTime start, DateTime end) {
+    final next = _clampVisible(start, end);
+    _visibleStart = next.$1;
+    _visibleEnd = next.$2;
+  }
+
+  (DateTime, DateTime) _windowAround(DateTime at) {
+    final full = _appliedEnd.difference(_appliedStart);
+    var span = Duration(microseconds: full.inMicroseconds ~/ 8);
+    if (span < const Duration(minutes: 30) &&
+        full >= const Duration(minutes: 30)) {
+      span = const Duration(minutes: 30);
+    }
+    if (span > full) span = full;
+    final half = Duration(microseconds: span.inMicroseconds ~/ 2);
+    return _clampVisible(at.subtract(half), at.add(half));
+  }
+
+  EmsHistoryPoint? _latestSelected(List<EmsHistoryPoint> points) {
+    EmsHistoryPoint? latest;
+    for (final metric in _metrics) {
+      final point = latestEmsPoint(
+        points,
+        metric,
+        start: _appliedStart,
+        end: _appliedEnd,
+      );
+      if (point == null) continue;
+      if (latest == null || point.loggedAt.isAfter(latest.loggedAt)) {
+        latest = point;
+      }
+    }
+    return latest;
+  }
+
+  (DateTime, DateTime) _displayedWindow(List<EmsHistoryPoint> points) {
+    if (!_followLatest) return (_visibleStart, _visibleEnd);
+    final latest = _latestSelected(points);
+    if (latest == null) return (_visibleStart, _visibleEnd);
+    final window = _windowAround(latest.loggedAt);
+    _visibleStart = window.$1;
+    _visibleEnd = window.$2;
+    return window;
   }
 
   void _zoomAt(double fraction, double scale) {
@@ -113,6 +158,7 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
         (spanUs * fraction).round();
     final startUs = anchor - (nextUs * fraction).round();
     setState(() {
+      _followLatest = false;
       _setVisible(
         DateTime.fromMicrosecondsSinceEpoch(startUs),
         DateTime.fromMicrosecondsSinceEpoch(startUs + nextUs),
@@ -121,15 +167,18 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
   }
 
   void _pan(double fraction) {
+    if (fraction == 0) return;
     final span = _visibleEnd.difference(_visibleStart);
     final shift = Duration(microseconds: (span.inMicroseconds * fraction).round());
     setState(() {
+      _followLatest = false;
       _setVisible(_visibleStart.add(shift), _visibleEnd.add(shift));
     });
   }
 
   void _showAll() {
     setState(() {
+      _followLatest = false;
       _visibleStart = _appliedStart;
       _visibleEnd = _appliedEnd;
     });
@@ -146,6 +195,7 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
       _appliedEnd = _draftEnd;
       _visibleStart = _draftStart;
       _visibleEnd = _draftEnd;
+      _followLatest = true;
       _focus = null;
     });
   }
@@ -160,6 +210,7 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
       _appliedEnd = end;
       _visibleStart = start;
       _visibleEnd = end;
+      _followLatest = true;
       _focus = null;
       _rangeError = false;
     });
@@ -187,22 +238,17 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
     );
     final value = point?.valueFor(metric);
     if (point == null || value == null) return;
-    final full = _appliedEnd.difference(_appliedStart);
-    var span = Duration(microseconds: full.inMicroseconds ~/ 8);
-    if (span < const Duration(minutes: 30) &&
-        full >= const Duration(minutes: 30)) {
-      span = const Duration(minutes: 30);
-    }
-    if (span > full) span = full;
-    final half = Duration(microseconds: span.inMicroseconds ~/ 2);
     setState(() {
+      _followLatest = false;
       _focus = _ChartFocus(
         metric: metric,
         minimum: minimum,
         at: point.loggedAt,
         value: value,
       );
-      _setVisible(point.loggedAt.subtract(half), point.loggedAt.add(half));
+      final window = _windowAround(point.loggedAt);
+      _visibleStart = window.$1;
+      _visibleEnd = window.$2;
     });
   }
 
@@ -260,6 +306,7 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
   Widget build(BuildContext context) {
     final historyAsync = ref.watch(emsSensorHistoryRangeProvider(_query));
     final range = historyAsync.asData?.value ?? EmsHistoryRange.empty;
+    final window = _displayedWindow(range.points);
     final device = ref.watch(deviceProvider(widget.deviceId)).asData?.value;
 
     return AppScaffold(
@@ -314,7 +361,7 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
               TextButton(onPressed: _showAll, child: const Text('Gesamt')),
               const Spacer(),
               Text(
-                'Mausrad oder Ziehen',
+                'Mausrad, Ziehen oder Finger',
                 style: DeviceCardTextStyles.caption(context),
               ),
             ],
@@ -353,8 +400,8 @@ class _EmsHistoryPageState extends ConsumerState<EmsHistoryPage> {
                 _MetricChartCard(
                   metric: metric,
                   points: range.points,
-                  windowStart: _visibleStart,
-                  windowEnd: _visibleEnd,
+                  windowStart: window.$1,
+                  windowEnd: window.$2,
                   focus: _focus?.metric == metric ? _focus : null,
                   onZoom: _zoomAt,
                   onPan: _pan,
@@ -512,6 +559,8 @@ class _MetricChartCard extends StatelessWidget {
           !point.loggedAt.isAfter(windowEnd);
     });
     final span = windowEnd.difference(windowStart);
+    final latest = latestEmsPoint(points, metric);
+    final latestValue = latest?.valueFor(metric);
 
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.containerPadding),
@@ -532,6 +581,13 @@ class _MetricChartCard extends StatelessWidget {
               TextButton(onPressed: onMaximum, child: const Text('Maximum')),
             ],
           ),
+          if (latest != null && latestValue != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Letzter Wert: ${formatEmsHistoryValue(metric, latestValue)}',
+              style: DeviceCardTextStyles.caption(context, emphasis: true),
+            ),
+          ],
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
             height: 168,
@@ -547,7 +603,7 @@ class _MetricChartCard extends StatelessWidget {
                     windowEnd: windowEnd,
                     color: color,
                     dotColor: context.colors.onPrimary,
-                    focusAt: focus?.at,
+                    focusAt: focus?.at ?? latest?.loggedAt,
                   ),
                   if (!hasVisible)
                     Center(
@@ -566,7 +622,7 @@ class _MetricChartCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(
               '${focus!.minimum ? 'Minimum' : 'Maximum'}: '
-              '${_formatValue(metric, focus!.value)} · ${_formatStamp(focus!.at)}',
+              '${formatEmsHistoryValue(metric, focus!.value)} · ${_formatStamp(focus!.at)}',
               style: DeviceCardTextStyles.caption(context, emphasis: true),
             ),
           ],
@@ -698,11 +754,4 @@ String _formatAxis(DateTime time, Duration span) {
   final clock = _formatClock(time);
   if (span.inHours >= 24) return '${_two(time.day)}.${_two(time.month)}. $clock';
   return clock;
-}
-
-String _formatValue(EmsHistoryMetric metric, double value) {
-  final digits = metric == EmsHistoryMetric.temperature ? 1 : 0;
-  final number = value.toStringAsFixed(digits);
-  if (metric.unit.isEmpty) return number;
-  return '$number ${metric.unit}';
 }

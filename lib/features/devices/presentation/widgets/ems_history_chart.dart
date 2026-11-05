@@ -29,6 +29,14 @@ class _EmsHistoryChartState extends ConsumerState<EmsHistoryChart> {
   Widget build(BuildContext context) {
     final historyAsync = ref.watch(emsSensorHistoryProvider(widget.deviceId));
     final points = historyAsync.asData?.value ?? const <EmsHistoryPoint>[];
+    final now = DateTime.now();
+    final latest = latestEmsPoint(
+      points,
+      _metric,
+      start: now.subtract(const Duration(hours: 24)),
+      end: now,
+    );
+    final latestValue = latest?.valueFor(_metric);
 
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.containerPadding),
@@ -44,11 +52,26 @@ class _EmsHistoryChartState extends ConsumerState<EmsHistoryChart> {
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: Text(
-                  '24h Verlauf',
-                  style: DeviceCardTextStyles.title(context),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '24h Verlauf',
+                      style: DeviceCardTextStyles.title(context),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (latestValue != null)
+                      Text(
+                        'Letzter Wert: ${formatEmsHistoryValue(_metric, latestValue)}',
+                        style: DeviceCardTextStyles.caption(
+                          context,
+                          emphasis: true,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),

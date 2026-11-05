@@ -133,12 +133,20 @@ class EmsRoomCard extends ConsumerWidget {
               ],
             ),
           ),
-          if (reading.isStabilizing) ...[
+          if (reading.isStabilizing || reading.isRunInActive) ...[
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Sensor stabilisiert sich noch.',
-              style: DeviceCardTextStyles.caption(context),
-            ),
+            if (reading.isStabilizing)
+              Text(
+                'Sensor stabilisiert sich noch.',
+                style: DeviceCardTextStyles.caption(context),
+              ),
+            if (reading.isStabilizing && reading.isRunInActive)
+              const SizedBox(height: AppSpacing.xs),
+            if (reading.isRunInActive)
+              Text(
+                'Sensor Einlaufphase aktiv',
+                style: DeviceCardTextStyles.caption(context),
+              ),
           ],
           if (readingAsync.hasError) ...[
             const SizedBox(height: AppSpacing.sm),

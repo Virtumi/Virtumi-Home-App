@@ -296,11 +296,15 @@ class UdpDeviceService {
       matches: (json) {
         if (isBareReadRequestEcho(json, 10)) return false;
         return json.containsKey('iaq') ||
+            json.containsKey('static_iaq') ||
             json.containsKey('accuracy') ||
             json.containsKey('raw_temperature') ||
+            json.containsKey('sensor_heat_compensated_temperature') ||
             json.containsKey('raw_pressure') ||
             json.containsKey('raw_humidity') ||
-            json.containsKey('co2_equivalent');
+            json.containsKey('sensor_heat_compensated_humidity') ||
+            json.containsKey('co2_equivalent') ||
+            json.containsKey('breath_voc_equivalent');
       },
     );
   }

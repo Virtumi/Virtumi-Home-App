@@ -1,9 +1,13 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/theme.dart';
 import '../../../../shared/models/models.dart';
 
 /// Area chart for one climate series inside [windowStart] and [windowEnd].
-class EmsSeriesChart extends StatelessWidget {
+///
+/// A short click or tap places a vertical probe on the nearest sample.
+class EmsSeriesChart extends StatefulWidget {
   const EmsSeriesChart({
     super.key,
     required this.metric,
@@ -26,29 +30,102 @@ class EmsSeriesChart extends StatelessWidget {
   final DateTime? focusAt;
 
   @override
+  State<EmsSeriesChart> createState() => _EmsSeriesChartState();
+}
+
+class _EmsSeriesChartState extends State<EmsSeriesChart> {
+  DateTime? _probeAt;
+  int? _pointer;
+  Offset? _down;
+
+  void _onPointerDown(PointerDownEvent event) {
+    if (_pointer != null) return;
+    _pointer = event.pointer;
+    _down = event.localPosition;
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    if (event.pointer != _pointer) return;
+    final down = _down;
+    _pointer = null;
+    _down = null;
+    if (down == null) return;
+    if ((event.localPosition - down).distance > kTouchSlop) return;
+    _select(event.localPosition);
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    if (event.pointer != _pointer) return;
+    _pointer = null;
+    _down = null;
+  }
+
+  void _select(Offset local) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final plot = _plotRect(box.size);
+    if (plot.width <= 0) return;
+    final samples = _samples();
+    if (samples.isEmpty) return;
+    final fraction = ((local.dx - plot.left) / plot.width).clamp(0.0, 1.0);
+    var best = samples.first;
+    var bestDistance = (best.x - fraction).abs();
+    for (final sample in samples.skip(1)) {
+      final distance = (sample.x - fraction).abs();
+      if (distance < bestDistance) {
+        best = sample;
+        bestDistance = distance;
+      }
+    }
+    setState(() => _probeAt = best.at);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final spanUs = windowEnd.difference(windowStart).inMicroseconds;
+    final spanUs = widget.windowEnd.difference(widget.windowStart).inMicroseconds;
     final samples = spanUs <= 0 ? const <_Sample>[] : _samples(spanUs);
     final gapFraction = spanUs <= 0
         ? 1.0
         : const Duration(minutes: 30).inMicroseconds / spanUs;
-    return CustomPaint(
-      painter: _SeriesChartPainter(
-        samples: samples,
-        color: color,
-        dotColor: dotColor,
-        gapFraction: gapFraction,
+    final probe = _probeSample(samples);
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: _onPointerDown,
+      onPointerUp: _onPointerUp,
+      onPointerCancel: _onPointerCancel,
+      child: CustomPaint(
+        painter: _SeriesChartPainter(
+          samples: samples,
+          color: widget.color,
+          dotColor: widget.dotColor,
+          gapFraction: gapFraction,
+          probeColor: context.colors.onSurface,
+          probeBackground: context.colors.surface,
+          probe: probe,
+        ),
+        child: const SizedBox.expand(),
       ),
-      child: const SizedBox.expand(),
     );
   }
 
-  List<_Sample> _samples(int spanUs) {
+  _Sample? _probeSample(List<_Sample> samples) {
+    final probeAt = _probeAt;
+    if (probeAt == null) return null;
+    for (final sample in samples) {
+      if (sample.at == probeAt) return sample;
+    }
+    return null;
+  }
+
+  List<_Sample> _samples([int? spanUs]) {
+    final span = spanUs ??
+        widget.windowEnd.difference(widget.windowStart).inMicroseconds;
+    if (span <= 0) return const [];
     final values = <(DateTime, double)>[];
-    for (final point in points) {
-      if (point.loggedAt.isBefore(windowStart)) continue;
-      if (point.loggedAt.isAfter(windowEnd)) continue;
-      final value = point.valueFor(metric);
+    for (final point in widget.points) {
+      if (point.loggedAt.isBefore(widget.windowStart)) continue;
+      if (point.loggedAt.isAfter(widget.windowEnd)) continue;
+      final value = point.valueFor(widget.metric);
       if (value == null) continue;
       values.add((point.loggedAt, value));
     }
@@ -60,19 +137,19 @@ class EmsSeriesChart extends StatelessWidget {
       if (sample.$2 < minValue) minValue = sample.$2;
       if (sample.$2 > maxValue) maxValue = sample.$2;
     }
-    final span = maxValue - minValue;
-    if (span < 0.01) {
+    final range = maxValue - minValue;
+    if (range < 0.01) {
       minValue -= 1;
       maxValue += 1;
     } else {
-      final pad = span * 0.14;
+      final pad = range * 0.14;
       minValue -= pad;
       maxValue += pad;
     }
     final valueSpan = maxValue - minValue;
 
     var focusIndex = -1;
-    final focus = focusAt;
+    final focus = widget.focusAt;
     if (focus != null) {
       var bestDelta = 1 << 62;
       for (var i = 0; i < values.length; i++) {
@@ -90,8 +167,10 @@ class EmsSeriesChart extends StatelessWidget {
     return [
       for (var i = 0; i < values.length; i++)
         _Sample(
-          x: values[i].$1.difference(windowStart).inMicroseconds / spanUs,
+          x: values[i].$1.difference(widget.windowStart).inMicroseconds / span,
           y: (1 - (values[i].$2 - minValue) / valueSpan).clamp(0, 1),
+          at: values[i].$1,
+          label: formatEmsHistoryValue(widget.metric, values[i].$2),
           focused: i == focusIndex,
         ),
     ];
@@ -99,11 +178,23 @@ class EmsSeriesChart extends StatelessWidget {
 }
 
 class _Sample {
-  const _Sample({required this.x, required this.y, this.focused = false});
+  const _Sample({
+    required this.x,
+    required this.y,
+    required this.at,
+    required this.label,
+    this.focused = false,
+  });
 
   final double x;
   final double y;
+  final DateTime at;
+  final String label;
   final bool focused;
+}
+
+Rect _plotRect(Size size) {
+  return Rect.fromLTWH(4, 12, size.width - 12, size.height - 20);
 }
 
 class _SeriesChartPainter extends CustomPainter {
@@ -112,19 +203,24 @@ class _SeriesChartPainter extends CustomPainter {
     required this.color,
     required this.dotColor,
     required this.gapFraction,
+    required this.probeColor,
+    required this.probeBackground,
+    required this.probe,
   });
 
   final List<_Sample> samples;
   final Color color;
   final Color dotColor;
-
-  /// Time gap, as a fraction of the visible window, that breaks the line.
   final double gapFraction;
+  final Color probeColor;
+  final Color probeBackground;
+  final _Sample? probe;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (samples.isEmpty) return;
-    final plot = Rect.fromLTWH(4, 12, size.width - 12, size.height - 20);
+    final plot = _plotRect(size);
+    if (plot.width <= 0 || plot.height <= 0) return;
     final pixels = [
       for (final sample in samples)
         Offset(
@@ -161,6 +257,58 @@ class _SeriesChartPainter extends CustomPainter {
       );
     }
     _drawDot(canvas, dot, color);
+    final selected = probe;
+    if (selected == null) return;
+    final index = samples.indexWhere((sample) => sample.at == selected.at);
+    if (index < 0) return;
+    _drawProbe(canvas, pixels[index], plot, selected);
+  }
+
+  void _drawProbe(Canvas canvas, Offset point, Rect plot, _Sample sample) {
+    canvas.drawLine(
+      Offset(point.dx, plot.top),
+      Offset(point.dx, plot.bottom),
+      Paint()
+        ..color = probeColor
+        ..strokeWidth = 1.75,
+    );
+    _drawDot(canvas, point, probeColor);
+
+    final label = TextPainter(
+      text: TextSpan(
+        text: sample.label,
+        style: TextStyle(
+          color: probeColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    const pad = 4.0;
+    final chipWidth = label.width + pad * 2;
+    final chipHeight = label.height + pad * 2;
+    var left = point.dx + 8;
+    var top = point.dy - chipHeight / 2;
+    if (left + chipWidth > plot.right) left = point.dx - 8 - chipWidth;
+    if (left < plot.left) left = plot.left;
+    if (top < plot.top) top = plot.top;
+    if (top + chipHeight > plot.bottom) top = plot.bottom - chipHeight;
+
+    final chip = RRect.fromRectAndRadius(
+      Rect.fromLTWH(left, top, chipWidth, chipHeight),
+      const Radius.circular(6),
+    );
+    canvas.drawRRect(chip, Paint()..color = probeBackground);
+    canvas.drawRRect(
+      chip,
+      Paint()
+        ..color = probeColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    label.paint(canvas, Offset(left + pad, top + pad));
   }
 
   void _drawSegment(Canvas canvas, List<Offset> points, Rect plot, Color color) {
@@ -212,6 +360,10 @@ class _SeriesChartPainter extends CustomPainter {
     return oldDelegate.color != color ||
         oldDelegate.dotColor != dotColor ||
         oldDelegate.gapFraction != gapFraction ||
+        oldDelegate.probeColor != probeColor ||
+        oldDelegate.probeBackground != probeBackground ||
+        oldDelegate.probe?.at != probe?.at ||
+        oldDelegate.probe?.label != probe?.label ||
         oldDelegate.samples != samples;
   }
 }

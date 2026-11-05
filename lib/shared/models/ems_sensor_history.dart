@@ -7,17 +7,17 @@ import 'ems_sensor_reading.dart';
 class EmsHistoryPoint {
   const EmsHistoryPoint({
     required this.loggedAt,
-    this.iaq,
-    this.rawTemperature,
-    this.rawHumidity,
+    this.staticIaq,
+    this.compensatedTemperature,
+    this.compensatedHumidity,
     this.rawPressure,
   });
 
   /// Local time. Naive database timestamps are treated as UTC.
   final DateTime loggedAt;
-  final double? iaq;
-  final double? rawTemperature;
-  final double? rawHumidity;
+  final double? staticIaq;
+  final double? compensatedTemperature;
+  final double? compensatedHumidity;
   final double? rawPressure;
 
   static EmsHistoryPoint? fromJson(Map<String, dynamic> json) {
@@ -25,18 +25,20 @@ class EmsHistoryPoint {
     if (loggedAt == null) return null;
     return EmsHistoryPoint(
       loggedAt: loggedAt,
-      iaq: _asDouble(json['iaq']),
-      rawTemperature: _asDouble(json['raw_temperature']),
-      rawHumidity: _asDouble(json['raw_humidity']),
+      staticIaq: _asDouble(json['static_iaq']),
+      compensatedTemperature: _asDouble(
+        json['sensor_heat_compensated_temperature'],
+      ),
+      compensatedHumidity: _asDouble(json['sensor_heat_compensated_humidity']),
       rawPressure: _asDouble(json['raw_pressure']),
     );
   }
 
   double? valueFor(EmsHistoryMetric metric) {
     return switch (metric) {
-      EmsHistoryMetric.aqi => iaq,
-      EmsHistoryMetric.temperature => rawTemperature,
-      EmsHistoryMetric.humidity => rawHumidity,
+      EmsHistoryMetric.aqi => staticIaq,
+      EmsHistoryMetric.temperature => compensatedTemperature,
+      EmsHistoryMetric.humidity => compensatedHumidity,
       EmsHistoryMetric.pressure => emsPressureHpa(rawPressure),
     };
   }
@@ -113,6 +115,33 @@ EmsHistoryPoint? extremeEmsPoint(
     }
   }
   return best;
+}
+
+/// Newest sample of [metric] inside the optional window.
+EmsHistoryPoint? latestEmsPoint(
+  List<EmsHistoryPoint> points,
+  EmsHistoryMetric metric, {
+  DateTime? start,
+  DateTime? end,
+}) {
+  EmsHistoryPoint? latest;
+  for (final point in points) {
+    if (start != null && point.loggedAt.isBefore(start)) continue;
+    if (end != null && point.loggedAt.isAfter(end)) continue;
+    if (point.valueFor(metric) == null) continue;
+    if (latest == null || point.loggedAt.isAfter(latest.loggedAt)) {
+      latest = point;
+    }
+  }
+  return latest;
+}
+
+/// Display text for one history value, with the metric unit when it has one.
+String formatEmsHistoryValue(EmsHistoryMetric metric, double value) {
+  final digits = metric == EmsHistoryMetric.temperature ? 1 : 0;
+  final number = value.toStringAsFixed(digits);
+  if (metric.unit.isEmpty) return number;
+  return '$number ${metric.unit}';
 }
 
 /// Parses `logged_at`. Values without a timezone are UTC.

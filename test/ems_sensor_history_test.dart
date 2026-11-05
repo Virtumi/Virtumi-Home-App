@@ -2,12 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:virtumi_home/shared/models/ems_sensor_history.dart';
 
 void main() {
-  test('reads raw climate values and keeps hPa pressure', () {
+  test('reads compensated climate values and keeps hPa pressure', () {
     final point = EmsHistoryPoint.fromJson({
       'logged_at': '2026-11-02T19:40:59.2859',
-      'iaq': 62.0542,
-      'raw_temperature': 20.83488,
-      'raw_humidity': 62.06077,
+      'iaq': 10,
+      'static_iaq': 62.0542,
+      'raw_temperature': 30,
+      'raw_humidity': 20,
+      'sensor_heat_compensated_temperature': 20.83488,
+      'sensor_heat_compensated_humidity': 62.06077,
       'raw_pressure': 986.8304,
     });
 
@@ -39,9 +42,9 @@ void main() {
     final mid = DateTime.utc(2026, 11, 2, 12);
     final late = DateTime.utc(2026, 11, 2, 18);
     final points = [
-      EmsHistoryPoint(loggedAt: early, rawTemperature: 22),
-      EmsHistoryPoint(loggedAt: mid, rawTemperature: 18.5),
-      EmsHistoryPoint(loggedAt: late, rawTemperature: 25),
+      EmsHistoryPoint(loggedAt: early, compensatedTemperature: 22),
+      EmsHistoryPoint(loggedAt: mid, compensatedTemperature: 18.5),
+      EmsHistoryPoint(loggedAt: late, compensatedTemperature: 25),
     ];
 
     expect(
@@ -56,8 +59,23 @@ void main() {
         minimum: false,
         start: early,
         end: mid,
-      )?.rawTemperature,
+      )?.compensatedTemperature,
       22,
     );
+    expect(
+      latestEmsPoint(points, EmsHistoryMetric.temperature)?.loggedAt,
+      late,
+    );
+    expect(
+      latestEmsPoint(
+        points,
+        EmsHistoryMetric.temperature,
+        start: early,
+        end: mid,
+      )?.compensatedTemperature,
+      18.5,
+    );
+    expect(formatEmsHistoryValue(EmsHistoryMetric.temperature, 21.36), '21.4 °C');
+    expect(formatEmsHistoryValue(EmsHistoryMetric.aqi, 50), '50');
   });
 }

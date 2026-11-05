@@ -63,27 +63,29 @@ class EmsSensorReading {
     );
   }
 
-  double? get temperature => rawTemperature;
+  double? get temperature => sensorHeatCompensatedTemperature;
 
-  double? get humidity => rawHumidity;
+  double? get humidity => sensorHeatCompensatedHumidity;
 
   /// BME680 reports Pascal. Values above 2000 are converted to hPa.
   double? get pressureHpa => emsPressureHpa(rawPressure);
 
-  int? get aqi => iaq?.round();
+  int? get aqi => staticIaq?.round();
 
   int? get co2Ppm => co2Equivalent?.round();
 
-  EmsAirQuality get airQuality => EmsAirQuality.fromIaq(iaq);
+  EmsAirQuality get airQuality => EmsAirQuality.fromIaq(staticIaq);
 
-  /// Bosch run-in / stabilization flags: 0 means the sensor is not ready yet.
+  /// Bosch stabilization flag: 0 means stabilization is still ongoing.
   bool get isStabilizing {
     final stabilization = stabilizationStatus;
+    return stabilization != null && stabilization < 1;
+  }
+
+  /// Bosch run-in flag: 0 means the gas sensor is still in its run-in phase.
+  bool get isRunInActive {
     final runIn = runInStatus;
-    final waitingForStabilization =
-        stabilization != null && stabilization < 1;
-    final waitingForRunIn = runIn != null && runIn < 1;
-    return waitingForStabilization || waitingForRunIn;
+    return runIn != null && runIn == 0;
   }
 
   String get ventilationAdvice {
@@ -133,6 +135,8 @@ class EmsSensorReading {
 
   String get co2Label => co2Ppm?.toString() ?? '—';
 
+  String get vocLabel => _decimals(breathVocEquivalent, 2);
+
   /// BSEC IAQ accuracy: 0 stabilizing, 1 low, 2 medium, 3 high.
   String get accuracyLabel {
     final value = accuracy;
@@ -148,7 +152,7 @@ class EmsSensorReading {
 
   /// Position of the IAQ marker on a 0–500 scale.
   double get airQualityFraction {
-    final value = iaq;
+    final value = staticIaq;
     if (value == null) return 0;
     return (value / 500).clamp(0, 1);
   }
@@ -207,4 +211,13 @@ double? _asDouble(dynamic value) {
 String _fixed(double? value, int digits) {
   if (value == null) return '—';
   return value.toStringAsFixed(digits);
+}
+
+/// Up to [digits] decimal places, without trailing zeros.
+String _decimals(double? value, int digits) {
+  if (value == null) return '—';
+  var text = value.toStringAsFixed(digits);
+  if (!text.contains('.')) return text;
+  text = text.replaceFirst(RegExp(r'0+$'), '');
+  return text.replaceFirst(RegExp(r'\.$'), '');
 }
