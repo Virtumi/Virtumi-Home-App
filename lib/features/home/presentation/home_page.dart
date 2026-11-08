@@ -6,7 +6,6 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/widgets.dart';
-import '../../../core/services/preferences_service.dart';
 import '../../../shared/application/recent_house_activity.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
@@ -88,7 +87,7 @@ class _HousesSection extends ConsumerWidget {
     final recentHomesAsync = ref.watch(recentHomesProvider);
     final allHousesAsync = ref.watch(housesProvider);
     final showSeeAll = allHousesAsync.maybeWhen(
-      data: (houses) => houses.length > PreferencesService.maxRecentHouses,
+      data: (houses) => houses.isNotEmpty,
       orElse: () => false,
     );
 

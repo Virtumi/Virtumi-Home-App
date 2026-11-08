@@ -28,8 +28,10 @@ class AppSectionLabel extends StatelessWidget {
       child: trailing == null
           ? label
           : Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [label, trailing!],
+              children: [
+                Expanded(child: label),
+                trailing!,
+              ],
             ),
     );
   }

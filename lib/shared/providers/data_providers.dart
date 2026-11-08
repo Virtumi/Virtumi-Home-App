@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/rooms/application/room_devices_controller.dart';
-import '../../core/services/preferences_service.dart';
 import '../../core/supabase/realtime_guard.dart';
 import '../../core/supabase/realtime_service.dart';
 import '../../core/supabase/supabase_client.dart';
@@ -42,7 +41,8 @@ final housesProvider = FutureProvider<List<House>>((ref) {
   return ref.watch(smartHomeRepositoryProvider).getHouses();
 });
 
-/// Recently opened houses for the Home tab grid (max. 2).
+/// Houses for the Home tab grid. Recently opened homes come first, then every
+/// other home of the account so none are hidden behind the "Alle" page.
 final recentHomesProvider = FutureProvider<List<House>>((ref) async {
   final allHouses = await ref.watch(housesProvider.future);
   if (allHouses.isEmpty) return const [];
@@ -50,12 +50,13 @@ final recentHomesProvider = FutureProvider<List<House>>((ref) async {
   final ids = ref.watch(recentHouseActivityProvider);
   final byId = {for (final house in allHouses) house.id: house};
 
-  final recent = <House>[];
+  final ordered = <House>[];
+  final seen = <String>{};
   final validIds = <String>[];
   for (final id in ids) {
     final house = byId[id];
-    if (house != null) {
-      recent.add(house);
+    if (house != null && seen.add(house.id)) {
+      ordered.add(house);
       validIds.add(id);
     }
   }
@@ -64,11 +65,11 @@ final recentHomesProvider = FutureProvider<List<House>>((ref) async {
     await ref.read(recentHouseActivityProvider.notifier).syncStored(validIds);
   }
 
-  if (recent.isEmpty) {
-    return allHouses.take(PreferencesService.maxRecentHouses).toList();
+  for (final house in allHouses) {
+    if (seen.add(house.id)) ordered.add(house);
   }
 
-  return recent;
+  return ordered;
 });
 
 /// A single house by id.
