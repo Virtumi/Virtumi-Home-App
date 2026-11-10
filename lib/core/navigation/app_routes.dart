@@ -10,7 +10,7 @@ class AppRoute {
   static const String login = 'login';
   static const String register = 'register';
   static const String scenes = 'scenes';
-  static const String people = 'people';
+  static const String favorites = 'favorites';
   static const String settings = 'settings';
 
   // Settings sub
@@ -54,7 +54,7 @@ class Paths {
   static const String login = '/login';
   static const String register = '/register';
   static const String scenes = '/scenes';
-  static const String people = '/people';
+  static const String favorites = '/favorites';
   static const String settings = '/settings';
   static const String profile = '/settings/profile';
   static const String startScreen = '/settings/start-screen';

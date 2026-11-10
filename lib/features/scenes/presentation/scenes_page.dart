@@ -4,17 +4,9 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/widgets.dart';
 
-/// Scenes tab ("Szenen"). Designed consistently with the system (no Stitch
-/// reference exists for this tab yet).
+/// Scenes tab. Only the title card is live; the rest is still in development.
 class ScenesPage extends StatelessWidget {
   const ScenesPage({super.key});
-
-  static const _scenes = [
-    (Symbols.wb_sunny, 'Guten Morgen', 'green', '4 Geräte'),
-    (Symbols.movie, 'Filmabend', 'purple', '3 Geräte'),
-    (Symbols.bedtime, 'Gute Nacht', 'indigo', '6 Geräte'),
-    (Symbols.work, 'Fokus', 'blue', '2 Geräte'),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -22,88 +14,54 @@ class ScenesPage extends StatelessWidget {
       header: const AppHeader(showBack: false),
       body: AppScrollView(
         children: [
-          const SectionHeaderCard(
+          SectionHeaderCard(
             title: 'Szenen',
             icon: Symbols.bolt,
             subtitle: 'Automatisierungen mit einem Tipp',
+            accent: context.palette.accentGreen,
             filled: true,
           ),
-          ActionBannerCard(
-            icon: Symbols.add_circle,
-            title: 'Neue Szene erstellen',
-            subtitle: 'Geräte & Aktionen kombinieren',
-            accent: context.colors.primary,
-            trailingIcon: Symbols.add,
-            trailingFilledButton: true,
-            onTap: () {},
-          ),
-          const AppSectionLabel('Meine Szenen'),
-          for (final scene in _scenes) ...[
-            _SceneCard(
-              icon: scene.$1,
-              title: scene.$2,
-              accentKey: scene.$3,
-              subtitle: scene.$4,
-            ),
-            const SizedBox(height: AppSpacing.cardGap),
-          ],
+          const _InDevelopmentCard(),
         ],
       ),
     );
   }
 }
 
-class _SceneCard extends StatefulWidget {
-  const _SceneCard({
-    required this.icon,
-    required this.title,
-    required this.accentKey,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String accentKey;
-  final String subtitle;
-
-  @override
-  State<_SceneCard> createState() => _SceneCardState();
-}
-
-class _SceneCardState extends State<_SceneCard> {
-  bool _active = false;
+class _InDevelopmentCard extends StatelessWidget {
+  const _InDevelopmentCard();
 
   @override
   Widget build(BuildContext context) {
-    final accent = context.colors.primary;
+    final accent = context.palette.accentGreen;
     return AppCard(
-      child: Row(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          IconBox(
-            icon: widget.icon,
-            color: accent,
-            size: AppSizes.iconBoxMd,
-            filled: true,
-            glow: true,
-          ),
-          const SizedBox(width: AppSpacing.gutter),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(widget.title,
-                    style: context.text.bodyLarge
-                        ?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                Text(widget.subtitle, style: context.text.bodySmall),
-              ],
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              Symbols.construction,
+              size: 44,
+              color: accent,
+              fill: 1,
             ),
           ),
-          AppToggle(
-            value: _active,
-            onChanged: (v) => setState(() => _active = v),
-            semanticLabel: '${widget.title} aktivieren',
+          const SizedBox(height: AppSpacing.gutter),
+          Text(
+            'Dieser Bereich ist noch in der Entwicklung.',
+            textAlign: TextAlign.center,
+            style: context.text.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: context.colors.onSurface,
+            ),
           ),
         ],
       ),

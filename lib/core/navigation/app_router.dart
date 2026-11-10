@@ -27,7 +27,7 @@ import '../../features/devices/presentation/virtumi_cloud_page.dart';
 import '../../features/floors/presentation/floors_page.dart';
 import '../../features/home/presentation/all_houses_page.dart';
 import '../../features/home/presentation/home_page.dart';
-import '../../features/people/presentation/people_page.dart';
+import '../../features/favorites/presentation/favorites_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../../features/rooms/presentation/room_overview_page.dart';
 import '../../features/rooms/presentation/rooms_page.dart';
@@ -171,10 +171,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           ]),
           StatefulShellBranch(routes: [
             GoRoute(
-              path: Paths.people,
-              name: AppRoute.people,
+              path: Paths.favorites,
+              name: AppRoute.favorites,
               pageBuilder: (context, state) =>
-                  fadePage(state, const PeoplePage()),
+                  fadePage(state, const FavoritesPage()),
             ),
           ]),
           StatefulShellBranch(routes: [

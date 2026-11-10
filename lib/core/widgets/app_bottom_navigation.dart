@@ -15,8 +15,9 @@ class AppNavDestination {
 
 /// Floating glassmorphic bottom navigation bar, identical on every tab screen.
 ///
-/// The active tab is highlighted with a primary, filled icon inside a soft
-/// circle plus a blurred glow behind it.
+/// The active tab is highlighted with a filled icon inside a soft circle plus
+/// a blurred glow. Home stays blue, Szenen green, Favoriten red, Einstellungen
+/// orange.
 class AppBottomNavigation extends StatelessWidget {
   const AppBottomNavigation({
     super.key,
@@ -30,7 +31,7 @@ class AppBottomNavigation extends StatelessWidget {
   static const List<AppNavDestination> destinations = [
     AppNavDestination(icon: Symbols.home, label: 'Home'),
     AppNavDestination(icon: Symbols.bolt, label: 'Szenen'),
-    AppNavDestination(icon: Symbols.group, label: 'Personen'),
+    AppNavDestination(icon: Symbols.favorite, label: 'Favoriten'),
     AppNavDestination(icon: Symbols.settings, label: 'Einstellungen'),
   ];
 
@@ -67,6 +68,7 @@ class AppBottomNavigation extends StatelessWidget {
                   _NavItem(
                     destination: destinations[i],
                     active: i == currentIndex,
+                    accent: _accentFor(context, i),
                     onTap: () => onTap(i),
                   ),
               ],
@@ -78,20 +80,38 @@ class AppBottomNavigation extends StatelessWidget {
   }
 }
 
+/// Saturated red for the Favoriten tab in dark mode. The palette red there
+/// is a pale pink and would not read as red.
+const _favoriteRedDark = Color(0xFFFF4D5A);
+
+Color _accentFor(BuildContext context, int index) {
+  final palette = context.palette;
+  return switch (index) {
+    0 => context.colors.primary,
+    1 => palette.accentGreen,
+    2 => Theme.of(context).brightness == Brightness.dark
+        ? _favoriteRedDark
+        : palette.accentRed,
+    3 => palette.accentOrange,
+    _ => context.colors.primary,
+  };
+}
+
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.destination,
     required this.active,
+    required this.accent,
     required this.onTap,
   });
 
   final AppNavDestination destination;
   final bool active;
+  final Color accent;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final primary = context.colors.primary;
     final inactive = context.colors.onSurfaceVariant.withValues(alpha: 0.6);
     final palette = context.palette;
 
@@ -115,20 +135,20 @@ class _NavItem extends StatelessWidget {
                       height: 40,
                       decoration: BoxDecoration(
                         color: palette.flatElevation
-                            ? primary.withValues(alpha: 0.15)
+                            ? accent.withValues(alpha: 0.15)
                             : context.colors.surfaceContainerHighest
                                 .withValues(alpha: 0.6),
                         shape: BoxShape.circle,
                         border: palette.flatElevation
                             ? Border.all(
-                                color: primary.withValues(alpha: 0.35),
+                                color: accent.withValues(alpha: 0.35),
                               )
                             : null,
                         boxShadow: palette.flatElevation
                             ? null
                             : [
                                 BoxShadow(
-                                  color: primary.withValues(alpha: 0.25),
+                                  color: accent.withValues(alpha: 0.25),
                                   blurRadius: 12,
                                   spreadRadius: 2,
                                 ),
@@ -139,7 +159,7 @@ class _NavItem extends StatelessWidget {
                     destination.icon,
                     size: 24,
                     fill: active ? 1 : 0,
-                    color: active ? primary : inactive,
+                    color: active ? accent : inactive,
                   ),
                 ],
               ),
@@ -148,7 +168,7 @@ class _NavItem extends StatelessWidget {
             Text(
               destination.label,
               style: context.text.labelSmall?.copyWith(
-                color: active ? primary : inactive,
+                color: active ? accent : inactive,
                 fontWeight: active ? FontWeight.w700 : FontWeight.w600,
                 letterSpacing: 0.2,
               ),
