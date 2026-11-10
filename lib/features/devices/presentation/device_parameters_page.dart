@@ -8,6 +8,7 @@ import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
 import 'widgets/cp_parameter_card.dart';
+import 'widgets/device_settings_header.dart';
 import 'widgets/cp_parameter_form_sheet.dart';
 
 /// Control Panel parameter modules (cp_parameters): CRUD for active slots.
@@ -163,11 +164,10 @@ class DeviceParametersPage extends ConsumerWidget {
 
           return AppScrollView(
             children: [
-              const SectionHeaderCard(
+              DeviceSettingsHeader(
+                deviceId: deviceId,
                 title: 'Parameter',
-                subtitle: 'Verknüpfte Responder-Module',
                 icon: Symbols.tune,
-                filled: true,
               ),
               ActionBannerCard(
                 icon: Symbols.add,

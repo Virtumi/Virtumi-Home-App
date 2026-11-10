@@ -7,6 +7,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/providers/connection_mode_provider.dart';
 import '../../../shared/providers/data_providers.dart';
+import 'widgets/device_settings_header.dart';
 
 /// Read-only device information ("Geräte-Informationen").
 class DeviceInfoPage extends ConsumerWidget {
@@ -60,11 +61,10 @@ class DeviceInfoPage extends ConsumerWidget {
 
           return AppScrollView(
             children: [
-              SectionHeaderCard(
+              DeviceSettingsHeader(
+                deviceId: deviceId,
                 title: 'Geräte-Informationen',
-                subtitle: name,
                 icon: Symbols.info,
-                filled: true,
               ),
               if (isDirect && udpInfoAsync != null && udpInfoAsync.isLoading)
                 const Padding(

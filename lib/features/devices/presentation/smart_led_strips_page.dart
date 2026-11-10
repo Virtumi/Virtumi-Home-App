@@ -11,6 +11,7 @@ import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
 import 'widgets/brightness_control.dart';
+import 'widgets/device_settings_header.dart';
 import 'widgets/led_color_palette.dart';
 
 /// Smart LED strip settings (LED 1–3) from smart_led_settings.
@@ -95,11 +96,10 @@ class _SmartLedStripsPageState extends ConsumerState<SmartLedStripsPage> {
 
           return AppScrollView(
             children: [
-              const SectionHeaderCard(
+              DeviceSettingsHeader(
+                deviceId: widget.deviceId,
                 title: 'LED-Streifen',
-                subtitle: 'Steuerung LED 1–3',
                 icon: Symbols.light_group,
-                filled: true,
               ),
               SegmentedButton<int>(
                 segments: const [

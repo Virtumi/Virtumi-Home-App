@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/services/preferences_service.dart';
 import '../../core/supabase/supabase_client.dart';
+import '../application/direct_device_link.dart';
 import '../application/recent_device_activity.dart';
 import '../data/activity_tracking/activity_tracking_device_request_repository.dart';
 import '../data/activity_tracking/activity_tracking_smart_home_repository.dart';
@@ -52,6 +53,15 @@ final mockStoreProvider = Provider<MockStore>((ref) => MockStore.instance);
 
 void _recordDeviceActivity(Ref ref, String deviceId) {
   ref.read(recentDeviceActivityProvider.notifier).record(deviceId);
+}
+
+void _reportDirectLink(Ref ref, String deviceId, bool online) {
+  final link = ref.read(directDeviceLinkProvider.notifier);
+  if (online) {
+    link.markOnline(deviceId);
+  } else {
+    link.markOffline(deviceId);
+  }
 }
 
 /// Location hierarchy repository.
@@ -139,6 +149,7 @@ final smartLedRepositoryProvider = Provider<SmartLedRepository>((ref) {
   final direct = UdpSmartLedRepository(
     ref.watch(udpDeviceServiceProvider),
     ref.watch(deviceEndpointResolverProvider),
+    onLink: (deviceId, online) => _reportDirectLink(ref, deviceId, online),
   );
   final inner = connectionAwareSmartLedRepository(
     ref,
@@ -158,6 +169,7 @@ final emsSensorRepositoryProvider = Provider<EmsSensorRepository>((ref) {
   final direct = UdpEmsSensorRepository(
     ref.watch(udpDeviceServiceProvider),
     ref.watch(deviceEndpointResolverProvider),
+    onLink: (deviceId, online) => _reportDirectLink(ref, deviceId, online),
   );
   return connectionAwareEmsSensorRepository(
     ref,

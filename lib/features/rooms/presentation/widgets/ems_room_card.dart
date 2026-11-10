@@ -4,9 +4,11 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../../core/theme/theme.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../../shared/application/direct_device_link.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/data_providers.dart';
 import 'device_card_text_styles.dart';
+import 'device_online_badge.dart';
 import 'ems_climate_widgets.dart';
 
 /// Compact climate card for the room overview.
@@ -28,13 +30,14 @@ class EmsRoomCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final online = deviceIsOnline(ref, device);
     final readingAsync = ref.watch(emsSensorProvider(device.id));
     final reading = readingAsync.asData?.value ?? EmsSensorReading.empty;
     final quality = reading.airQuality;
     final qualityColor = emsAirQualityColor(context, quality);
 
     return AppCard(
-      onTap: showDetailsButton ? onOpenDetails : null,
+      onTap: online && showDetailsButton ? onOpenDetails : null,
       padding: const EdgeInsets.all(AppSpacing.containerPadding),
       semanticLabel: emsDisplayName,
       child: Column(
@@ -68,7 +71,9 @@ class EmsRoomCard extends ConsumerWidget {
                   ],
                 ),
               ),
-              if (showSettingsButton) ...[
+              DeviceOnlineBadge(device: device),
+              if (online && showSettingsButton) ...[
+                const SizedBox(width: AppSpacing.sm),
                 NeumorphicIconButton(
                   icon: Symbols.settings,
                   iconColor: context.colors.onSurface,
@@ -78,11 +83,13 @@ class EmsRoomCard extends ConsumerWidget {
                   onPressed: onOpenSettings,
                 ),
               ],
-              if (showSettingsButton && showDetailsButton)
+              if (online && showSettingsButton && showDetailsButton)
                 const SizedBox(width: AppSpacing.sm),
-              if (showDetailsButton) _DetailsButton(onPressed: onOpenDetails),
+              if (online && showDetailsButton)
+                _DetailsButton(onPressed: onOpenDetails),
             ],
           ),
+          if (online) ...[
           const SizedBox(height: AppSpacing.lg),
           NeumorphicContainer(
             style: NeumorphicStyle.sunken,
@@ -189,6 +196,7 @@ class EmsRoomCard extends ConsumerWidget {
               ),
             ],
           ),
+          ],
         ],
       ),
     );

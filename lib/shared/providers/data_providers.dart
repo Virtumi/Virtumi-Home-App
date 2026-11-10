@@ -5,6 +5,7 @@ import '../../features/rooms/application/room_devices_controller.dart';
 import '../../core/supabase/realtime_guard.dart';
 import '../../core/supabase/realtime_service.dart';
 import '../../core/supabase/supabase_client.dart';
+import '../application/favorite_devices.dart';
 import '../application/recent_device_activity.dart';
 import '../application/recent_house_activity.dart';
 import '../domain/device_config_repository.dart';
@@ -17,6 +18,7 @@ void refreshHomeScreenData(WidgetRef ref) {
   ref.invalidate(housesProvider);
   ref.invalidate(recentHomesProvider);
   ref.invalidate(recentActivityDevicesProvider);
+  ref.invalidate(favoriteDevicesEntriesProvider);
 }
 
 /// Invalidates all location-related providers so Home, floors, rooms and
@@ -31,6 +33,7 @@ void invalidateLocationHierarchy(WidgetRef ref, {String? deviceId}) {
   ref.invalidate(roomProvider);
   ref.invalidate(roomDevicesControllerProvider);
   ref.invalidate(recentActivityDevicesProvider);
+  ref.invalidate(favoriteDevicesEntriesProvider);
   if (deviceId != null) {
     ref.invalidate(deviceProvider(deviceId));
   }
@@ -296,6 +299,40 @@ final recentActivityDevicesProvider =
 
   if (validIds.length != ids.length) {
     await ref.read(recentDeviceActivityProvider.notifier).syncStored(validIds);
+  }
+
+  return devices;
+});
+
+/// Favorite devices for the Home section, newest mark first.
+final favoriteDevicesEntriesProvider =
+    FutureProvider<List<RecentActivityEntry>>((ref) async {
+  final ids = ref.watch(favoriteDevicesProvider);
+  if (ids.isEmpty) return const [];
+
+  final repo = ref.read(smartHomeRepositoryProvider);
+  final configRepo = ref.read(deviceConfigRepositoryProvider);
+  final devices = <RecentActivityEntry>[];
+  final validIds = <String>[];
+
+  for (final id in ids) {
+    final device = await repo.getDevice(id);
+    if (device != null) {
+      final locationPath = await _deviceLocationPath(
+        repo: repo,
+        configRepo: configRepo,
+        device: device,
+      );
+      devices.add(RecentActivityEntry(
+        device: device,
+        locationPath: locationPath,
+      ));
+      validIds.add(id);
+    }
+  }
+
+  if (validIds.length != ids.length) {
+    await ref.read(favoriteDevicesProvider.notifier).syncStored(validIds);
   }
 
   return devices;

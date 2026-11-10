@@ -143,6 +143,24 @@ class SettingsPage extends ConsumerWidget {
                     ),
                     onTap: () => context.push(Paths.startScreen),
                   ),
+                  SettingsRow.toggle(
+                    icon: Symbols.history,
+                    title: 'Letzte Aktivitäten',
+                    iconColor: p.accentIndigo,
+                    value: settings.showRecentActivity,
+                    onChanged: (v) => saveSettings(
+                      settings.copyWith(showRecentActivity: v),
+                    ),
+                  ),
+                  SettingsRow.toggle(
+                    icon: Symbols.favorite,
+                    title: 'Favoriten',
+                    iconColor: p.accentRed,
+                    value: settings.showFavorites,
+                    onChanged: (v) => saveSettings(
+                      settings.copyWith(showFavorites: v),
+                    ),
+                  ),
                   SettingsRow.navigation(
                     icon: Symbols.cloud_sync,
                     title: 'Verbindungsart',

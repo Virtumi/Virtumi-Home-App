@@ -128,6 +128,7 @@ class _UpdateSettingsPageState extends ConsumerState<UpdateSettingsPage> {
           return AppScrollView(
             children: [
               UpdateSettingsForm(
+                deviceId: widget.deviceId,
                 config: draft,
                 enabled: _editing,
                 onChanged: (updated) => setState(() => _draft = updated),

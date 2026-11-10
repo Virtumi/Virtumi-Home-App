@@ -11,6 +11,7 @@ import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
 import '../../rooms/presentation/widgets/smart_led_device_card.dart';
+import 'widgets/device_settings_header.dart';
 import '../../rooms/presentation/widgets/smart_led_effect_picker.dart';
 
 /// Detailed LED strip configuration (smart_led_settings) for Smart LED devices.
@@ -167,11 +168,10 @@ class _LedStripSettingsPageState extends ConsumerState<LedStripSettingsPage> {
 
           return AppScrollView(
             children: [
-              const SectionHeaderCard(
+              DeviceSettingsHeader(
+                deviceId: widget.deviceId,
                 title: 'LED Strip Einstellungen',
-                subtitle: 'Strip-Parameter & Effekte',
                 icon: Symbols.light_group,
-                filled: true,
               ),
               if (device != null) ...[
                 SmartLedDeviceCard(
@@ -179,7 +179,6 @@ class _LedStripSettingsPageState extends ConsumerState<LedStripSettingsPage> {
                   stripIndex: _stripIndex,
                   showSettingsButton: false,
                   showDetailsButton: false,
-                  showOfflineStatus: false,
                   onOpenDetails: () {},
                   onOpenSettings: () {},
                 ),

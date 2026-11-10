@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../shared/providers/repository_providers.dart';
+import 'widgets/device_settings_header.dart';
 
 /// Change device password (Supabase queue or direct UDP protocol 2).
 class ChangePasswordPage extends ConsumerStatefulWidget {
@@ -86,11 +87,10 @@ class _ChangePasswordPageState extends ConsumerState<ChangePasswordPage> {
       header: const AppHeader(),
       body: AppScrollView(
         children: [
-          const SectionHeaderCard(
+          DeviceSettingsHeader(
+            deviceId: widget.deviceId,
             title: 'Passwort ändern',
-            subtitle: 'Geräte-Zugang absichern',
             icon: Symbols.lock,
-            filled: true,
           ),
           const AppSectionLabel('Sicherheit'),
           GroupedListCard(

@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../../../core/theme/theme.dart';
 import '../../../../../core/widgets/widgets.dart';
 import '../../../../../shared/models/models.dart';
+import '../device_settings_header.dart';
 import '../location_field_card.dart';
 import '../location_name_input.dart';
 
@@ -15,6 +16,7 @@ class DeviceLocationForm extends StatefulWidget {
     required this.onChanged,
     this.footer,
     this.lockDeviceName = false,
+    this.deviceId,
   });
 
   final DeviceLocation location;
@@ -24,6 +26,9 @@ class DeviceLocationForm extends StatefulWidget {
 
   /// EMS keeps the stored name `EMS` and shows the long display name.
   final bool lockDeviceName;
+
+  /// Set on the device settings page. The setup wizard leaves this empty.
+  final String? deviceId;
 
   @override
   State<DeviceLocationForm> createState() => _DeviceLocationFormState();
@@ -133,13 +138,21 @@ class _DeviceLocationFormState extends State<DeviceLocationForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeaderCard(
-          title: 'Geräte Ort',
-          subtitle: 'Standort-Zuordnung',
-          icon: Symbols.location_on,
-          accent: AppColors.accentOrange,
-          filled: true,
-        ),
+        if (widget.deviceId != null)
+          DeviceSettingsHeader(
+            deviceId: widget.deviceId!,
+            title: 'Geräte Ort',
+            icon: Symbols.location_on,
+            accent: AppColors.accentOrange,
+          )
+        else
+          const SectionHeaderCard(
+            title: 'Geräte Ort',
+            subtitle: 'Standort-Zuordnung',
+            icon: Symbols.location_on,
+            accent: AppColors.accentOrange,
+            filled: true,
+          ),
         const AppSectionLabel('Gerätename'),
         GroupedListCard(
           children: [

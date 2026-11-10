@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../../../core/theme/theme.dart';
 import '../../../../../core/widgets/widgets.dart';
 import '../../../../../shared/models/models.dart';
+import '../device_settings_header.dart';
 import '../manual_date_time_card.dart';
 
 class DateTimeSettingsForm extends StatelessWidget {
@@ -14,6 +15,7 @@ class DateTimeSettingsForm extends StatelessWidget {
     required this.onChanged,
     required this.onPickTimezone,
     this.footer,
+    this.deviceId,
   });
 
   final DateTimeConfig config;
@@ -22,6 +24,9 @@ class DateTimeSettingsForm extends StatelessWidget {
   final VoidCallback onPickTimezone;
   final Widget? footer;
 
+  /// Set on the device settings page. The setup wizard leaves this empty.
+  final String? deviceId;
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -29,13 +34,21 @@ class DateTimeSettingsForm extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeaderCard(
-          title: 'Datum & Uhrzeit',
-          subtitle: 'Zeitzone & Synchronisierung',
-          icon: Symbols.schedule,
-          accent: AppColors.accentIndigo,
-          filled: true,
-        ),
+        if (deviceId != null)
+          DeviceSettingsHeader(
+            deviceId: deviceId!,
+            title: 'Datum & Uhrzeit',
+            icon: Symbols.schedule,
+            accent: AppColors.accentIndigo,
+          )
+        else
+          const SectionHeaderCard(
+            title: 'Datum & Uhrzeit',
+            subtitle: 'Zeitzone & Synchronisierung',
+            icon: Symbols.schedule,
+            accent: AppColors.accentIndigo,
+            filled: true,
+          ),
         const AppSectionLabel('Synchronisierung'),
         GroupedListCard(
           children: [

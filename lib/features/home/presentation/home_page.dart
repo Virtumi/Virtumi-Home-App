@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../shared/application/favorite_devices.dart';
 import '../../../shared/application/recent_house_activity.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
@@ -43,6 +44,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       data: (settings) => settings?.connectionModeLabel ?? 'Cloud',
       orElse: () => 'Cloud',
     );
+    final showRecentActivity = settingsAsync.maybeWhen(
+      data: (settings) => settings?.showRecentActivity ?? true,
+      orElse: () => true,
+    );
+    final showFavorites = settingsAsync.maybeWhen(
+      data: (settings) => settings?.showFavorites ?? true,
+      orElse: () => true,
+    );
 
     return AppScaffold(
       header: HomeTopBar(
@@ -62,7 +71,8 @@ class _HomePageState extends ConsumerState<HomePage> {
             onTap: () => context.push(Paths.newDeviceWizard),
           ),
           const _HousesSection(),
-          const _RecentActivitySection(),
+          if (showFavorites) const _FavoritesSection(),
+          if (showRecentActivity) const _RecentActivitySection(),
         ],
       ),
     );
@@ -147,6 +157,32 @@ class _HousesGrid extends StatelessWidget {
   }
 }
 
+class _FavoritesSection extends ConsumerWidget {
+  const _FavoritesSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ids = ref.watch(favoriteDevicesProvider);
+    if (ids.isEmpty) return const SizedBox.shrink();
+
+    final devicesAsync = ref.watch(favoriteDevicesEntriesProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const AppSectionLabel('Favoriten'),
+        AsyncValueView<List<RecentActivityEntry>>(
+          value: devicesAsync,
+          onRetry: () => ref.invalidate(favoriteDevicesEntriesProvider),
+          data: (entries) {
+            if (entries.isEmpty) return const SizedBox.shrink();
+            return _DeviceEntryList(entries: entries);
+          },
+        ),
+      ],
+    );
+  }
+}
+
 class _RecentActivitySection extends ConsumerWidget {
   const _RecentActivitySection();
 
@@ -169,27 +205,37 @@ class _RecentActivitySection extends ConsumerWidget {
                 padding: EdgeInsets.all(AppSpacing.lg),
               );
             }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final entry in entries) ...[
-                  NavTileCard(
-                    icon: entry.device.type.icon,
-                    title: entry.device.displayName,
-                    detail: entry.locationPath,
-                    subtitle: entry.device.type == DeviceType.environmentMonitor
-                        ? '$emsCategoryLabel · ${entry.device.connectivity.label}'
-                        : '${entry.device.type.label} · ${entry.device.statusLabel}',
-                    accent: context.colors.primary,
-                    onTap: () =>
-                        context.push(Paths.deviceDetails(entry.device.id)),
-                  ),
-                  const SizedBox(height: AppSpacing.cardGap),
-                ],
-              ],
-            );
+            return _DeviceEntryList(entries: entries);
           },
         ),
+      ],
+    );
+  }
+}
+
+class _DeviceEntryList extends StatelessWidget {
+  const _DeviceEntryList({required this.entries});
+
+  final List<RecentActivityEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final entry in entries) ...[
+          NavTileCard(
+            icon: entry.device.type.icon,
+            title: entry.device.displayName,
+            detail: entry.locationPath,
+            subtitle: entry.device.type == DeviceType.environmentMonitor
+                ? '$emsCategoryLabel · ${entry.device.connectivity.label}'
+                : '${entry.device.type.label} · ${entry.device.statusLabel}',
+            accent: context.colors.primary,
+            onTap: () => context.push(Paths.deviceDetails(entry.device.id)),
+          ),
+          const SizedBox(height: AppSpacing.cardGap),
+        ],
       ],
     );
   }

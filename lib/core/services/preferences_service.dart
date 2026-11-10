@@ -18,6 +18,7 @@ class PreferencesService {
   static const String _themeModeKey = 'theme_mode';
   static const String _recentDeviceIdsKey = 'recent_device_ids';
   static const String _recentHouseIdsKey = 'recent_house_ids';
+  static const String _favoriteDeviceIdsPrefix = 'favorite_device_ids_';
   static const String _startRouteKeyPrefix = 'start_route_';
   static const String _appSettingsKeyPrefix = 'app_settings_';
 
@@ -47,6 +48,13 @@ class PreferencesService {
     return _prefs.setStringList(_recentDeviceIdsKey, ids);
   }
 
+  List<String> favoriteDeviceIds(String userId) =>
+      _prefs.getStringList('$_favoriteDeviceIdsPrefix$userId') ?? const [];
+
+  Future<void> setFavoriteDeviceIds(String userId, List<String> ids) {
+    return _prefs.setStringList('$_favoriteDeviceIdsPrefix$userId', ids);
+  }
+
   List<String> get recentHouseIds =>
       _prefs.getStringList(_recentHouseIdsKey) ?? const [];
 
@@ -74,6 +82,8 @@ class PreferencesService {
       pinEnabled: stored?['pinEnabled'] as bool? ?? false,
       twoFactorEnabled: stored?['twoFactorEnabled'] as bool? ?? false,
       connectionMode: stored?['connectionMode'] as String? ?? 'cloud',
+      showRecentActivity: stored?['showRecentActivity'] as bool? ?? true,
+      showFavorites: stored?['showFavorites'] as bool? ?? true,
       startRoute: stored?['startRoute'] as String? ??
           (legacyStart != null && legacyStart.isNotEmpty
               ? legacyStart
@@ -93,6 +103,8 @@ class PreferencesService {
       'pinEnabled': settings.pinEnabled,
       'twoFactorEnabled': settings.twoFactorEnabled,
       'connectionMode': settings.connectionMode,
+      'showRecentActivity': settings.showRecentActivity,
+      'showFavorites': settings.showFavorites,
       'startRoute': settings.startRoute,
     };
     await _prefs.setString(

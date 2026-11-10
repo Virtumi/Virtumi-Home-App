@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../../../core/theme/theme.dart';
 import '../../../../../core/widgets/widgets.dart';
 import '../../../../../shared/models/models.dart';
+import '../device_settings_header.dart';
 import '../update_hero_card.dart';
 import '../update_settings_cards.dart';
 
@@ -18,6 +19,7 @@ class UpdateSettingsForm extends StatefulWidget {
     this.onStartUpdate,
     this.liveStatus,
     this.footer,
+    this.deviceId,
   });
 
   final UpdateConfig config;
@@ -28,6 +30,9 @@ class UpdateSettingsForm extends StatefulWidget {
   final VoidCallback? onStartUpdate;
   final DeviceUpdateStatus? liveStatus;
   final Widget? footer;
+
+  /// Set on the device settings page. The setup wizard leaves this empty.
+  final String? deviceId;
 
   @override
   State<UpdateSettingsForm> createState() => _UpdateSettingsFormState();
@@ -178,11 +183,18 @@ class _UpdateSettingsFormState extends State<UpdateSettingsForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeaderCard(
-          title: 'Update Einstellungen',
-          icon: Symbols.update,
-          filled: true,
-        ),
+        if (widget.deviceId != null)
+          DeviceSettingsHeader(
+            deviceId: widget.deviceId!,
+            title: 'Update Einstellungen',
+            icon: Symbols.update,
+          )
+        else
+          const SectionHeaderCard(
+            title: 'Update Einstellungen',
+            icon: Symbols.update,
+            filled: true,
+          ),
         const SizedBox(height: AppSpacing.cardGap),
         if (liveStatus?.status == 'failed') ...[
           AppCard(

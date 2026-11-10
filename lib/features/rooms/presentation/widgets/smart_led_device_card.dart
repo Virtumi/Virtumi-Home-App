@@ -10,11 +10,13 @@ import '../../../../core/supabase/realtime_service.dart';
 import '../../../../core/supabase/supabase_client.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../../shared/application/direct_device_link.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/data_providers.dart';
 import '../../../../shared/providers/repository_providers.dart';
 import '../../../devices/presentation/widgets/led_color_palette.dart';
 import 'device_card_text_styles.dart';
+import 'device_online_badge.dart';
 import 'smart_led_effect_picker.dart';
 
 /// Room card for Smart LED devices: quick control for power, color, brightness
@@ -30,7 +32,6 @@ class SmartLedDeviceCard extends ConsumerStatefulWidget {
     this.showDetailsButton = true,
     this.showExtendedEffectControls = false,
     this.showEffectPicker = true,
-    this.showOfflineStatus = true,
     this.refreshGeneration = 0,
   });
 
@@ -42,7 +43,6 @@ class SmartLedDeviceCard extends ConsumerStatefulWidget {
   final bool showDetailsButton;
   final bool showExtendedEffectControls;
   final bool showEffectPicker;
-  final bool showOfflineStatus;
 
   /// Incremented by the details screen refresh button. While this differs from
   /// the last applied value, optimistic edits are dropped and the card waits
@@ -161,9 +161,46 @@ class _SmartLedDeviceCardState extends ConsumerState<SmartLedDeviceCard> {
 
   @override
   Widget build(BuildContext context) {
-    final stripsAsync = ref.watch(smartLedStripsProvider(widget.device.id));
+    final online = deviceIsOnline(ref, widget.device);
     final primary = context.colors.primary;
-    final online = widget.device.connectivity == DeviceConnectivity.online;
+    if (!online) {
+      return AppCard(
+        padding: const EdgeInsets.all(AppSpacing.containerPadding),
+        child: Row(
+          children: [
+            IconBox(
+              icon: Symbols.light_group,
+              color: primary,
+              size: AppSizes.iconBoxMd,
+              filled: true,
+            ),
+            const SizedBox(width: AppSpacing.gutter),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.device.name,
+                    style: DeviceCardTextStyles.title(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Smart LED',
+                    style: DeviceCardTextStyles.subtitle(context),
+                  ),
+                ],
+              ),
+            ),
+            DeviceOnlineBadge(device: widget.device),
+          ],
+        ),
+      );
+    }
+
+    final stripsAsync = ref.watch(smartLedStripsProvider(widget.device.id));
     final awaitingRefresh = widget.refreshGeneration != _seenRefreshGeneration;
     final strips = stripsAsync.value;
     // First open has no strip yet. A refresh keeps the previous value so the
@@ -226,7 +263,9 @@ class _SmartLedDeviceCardState extends ConsumerState<SmartLedDeviceCard> {
                   ],
                 ),
               ),
+              DeviceOnlineBadge(device: widget.device),
               if (widget.showSettingsButton) ...[
+                const SizedBox(width: AppSpacing.sm),
                 NeumorphicIconButton(
                   icon: Symbols.settings,
                   iconColor: context.colors.onSurface,
@@ -242,10 +281,6 @@ class _SmartLedDeviceCardState extends ConsumerState<SmartLedDeviceCard> {
                 _PrimaryNavButton(onPressed: widget.onOpenDetails),
             ],
           ),
-          if (widget.showOfflineStatus || online) ...[
-            const SizedBox(height: AppSpacing.md),
-            Row(children: [_StatusChip(online: online)]),
-          ],
           const SizedBox(height: AppSpacing.md),
           _LedPowerButton(
             isOn: isOn,
@@ -566,44 +601,6 @@ class _PrimaryNavButton extends StatelessWidget {
           color: context.colors.onPrimary,
           size: 20,
         ),
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.online});
-
-  final bool online;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = online
-        ? context.palette.statusOnline
-        : context.colors.outline;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm + AppSpacing.xs,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: AppRadius.full,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            online ? 'Online' : 'Offline',
-            style: DeviceCardTextStyles.caption(context).copyWith(color: color),
-          ),
-        ],
       ),
     );
   }

@@ -16,7 +16,11 @@ abstract final class CpDeviceType {
     if (lower.contains('smart') && lower.contains('led')) return smartLed;
     if (lower.contains('smart') && lower.contains('switch')) return smartSwitch;
     if (lower.contains('socket') || lower.contains('steckdose')) return socket;
-    if (lower.contains('louver') || lower.contains('jalousie')) return louver;
+    if (lower.contains('louver') ||
+        lower.contains('jalousie') ||
+        lower.contains('blind')) {
+      return louver;
+    }
     if (lower.contains('heater') || lower.contains('heiz')) return heater;
     if (lower.contains('alarm')) return alarmSystem;
     if (lower.contains('control panel')) return controlPanel;

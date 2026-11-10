@@ -8,6 +8,7 @@ import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
 import 'widgets/connection_status_card.dart';
+import 'widgets/device_settings_header.dart';
 
 /// MQTT broker settings ("MQTT Cloud").
 class MqttCloudPage extends ConsumerStatefulWidget {
@@ -182,12 +183,11 @@ class _MqttCloudPageState extends ConsumerState<MqttCloudPage> {
           }
           return AppScrollView(
             children: [
-              const SectionHeaderCard(
+              DeviceSettingsHeader(
+                deviceId: widget.deviceId,
                 title: 'MQTT Cloud',
-                subtitle: 'Broker-Verbindung',
                 icon: Symbols.dns,
                 accent: AppColors.accentPurple,
-                filled: true,
               ),
               ConnectionStatusCard(
                 status: _status,

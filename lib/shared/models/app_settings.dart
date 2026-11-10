@@ -14,6 +14,8 @@ class AppSettings {
     this.twoFactorEnabled = false,
     this.connectionMode = 'cloud',
     this.startRoute = Paths.home,
+    this.showRecentActivity = true,
+    this.showFavorites = true,
   });
 
   final String userId;
@@ -26,6 +28,12 @@ class AppSettings {
 
   /// GoRouter location opened after login / cold start (default: [Paths.home]).
   final String startRoute;
+
+  /// Whether the Home tab shows the recent-activity section.
+  final bool showRecentActivity;
+
+  /// Whether the Home tab shows the favorites section.
+  final bool showFavorites;
 
   String get languageLabel => switch (language) {
         'de' => 'Deutsch',
@@ -47,6 +55,8 @@ class AppSettings {
     bool? twoFactorEnabled,
     String? connectionMode,
     String? startRoute,
+    bool? showRecentActivity,
+    bool? showFavorites,
   }) {
     return AppSettings(
       userId: userId,
@@ -57,6 +67,8 @@ class AppSettings {
       twoFactorEnabled: twoFactorEnabled ?? this.twoFactorEnabled,
       connectionMode: connectionMode ?? this.connectionMode,
       startRoute: startRoute ?? this.startRoute,
+      showRecentActivity: showRecentActivity ?? this.showRecentActivity,
+      showFavorites: showFavorites ?? this.showFavorites,
     );
   }
 }

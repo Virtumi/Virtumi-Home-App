@@ -7,6 +7,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
+import 'widgets/device_settings_header.dart';
 
 /// Bluetooth sensor data from device_data table.
 class DeviceDataPage extends ConsumerWidget {
@@ -65,11 +66,10 @@ class DeviceDataPage extends ConsumerWidget {
 
           return AppScrollView(
             children: [
-              const SectionHeaderCard(
+              DeviceSettingsHeader(
+                deviceId: deviceId,
                 title: 'Sensordaten',
-                subtitle: 'Bluetooth / device_data',
                 icon: Symbols.sensors,
-                filled: true,
               ),
               Align(
                 alignment: Alignment.centerRight,

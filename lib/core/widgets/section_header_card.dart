@@ -12,6 +12,7 @@ class SectionHeaderCard extends StatelessWidget {
     this.icon,
     this.imageAsset,
     this.subtitle,
+    this.detail,
     this.accent,
     this.onTap,
     this.heroTag,
@@ -23,6 +24,9 @@ class SectionHeaderCard extends StatelessWidget {
   final IconData? icon;
   final String? imageAsset;
   final String? subtitle;
+
+  /// Second small line under [subtitle], for example the place path.
+  final String? detail;
   final Color? accent;
   final VoidCallback? onTap;
   final Object? heroTag;
@@ -79,6 +83,17 @@ class SectionHeaderCard extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     subtitle!,
+                    style: context.text.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                if (detail != null) ...[
+                  SizedBox(
+                    height: subtitle == null ? AppSpacing.xs : 2,
+                  ),
+                  Text(
+                    detail!,
                     style: context.text.bodySmall,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

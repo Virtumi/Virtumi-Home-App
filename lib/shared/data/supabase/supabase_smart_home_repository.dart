@@ -30,7 +30,7 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
   _SyntheticTree? _syntheticTree;
   bool _useSynthetic = false;
 
-  static const _onlineThreshold = Duration(minutes: 10);
+  static const _onlineThreshold = Duration(minutes: 3);
 
   @override
   Future<List<House>> getHouses() async {
@@ -69,6 +69,7 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
     final floorsByHouse = <String, Map<String, Floor>>{};
     final roomsByFloor = <String, Map<String, Room>>{};
     final devicesByRoom = <String, List<Device>>{};
+    final livecom = await _latestLivecomByDevice(userId);
 
     for (final row in deviceRows) {
       final locationList = row['device_location_settings'];
@@ -104,62 +105,101 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
         () => Room(id: roomId, floorId: floorId, name: roomName),
       );
 
-      final connectivity = await _resolveConnectivity(row);
+      final deviceId = row['id'] as String;
       final device = mapDeviceRow(
         Map<String, dynamic>.from(row),
         roomId: roomId,
-        connectivity: connectivity,
+        connectivity: _connectivityFrom(livecom[deviceId]),
       );
 
       devicesByRoom.putIfAbsent(roomId, () => []).add(device);
     }
 
+    final roomsWithCounts = <String, List<Room>>{
+      for (final entry in roomsByFloor.entries)
+        entry.key: [
+          for (final room in entry.value.values)
+            Room(
+              id: room.id,
+              floorId: room.floorId,
+              name: room.name,
+              iconKey: room.iconKey,
+              icon: room.icon,
+              accentKey: room.accentKey,
+              deviceCount: devicesByRoom[room.id]?.length ?? 0,
+            ),
+        ],
+    };
+    final floorsWithCounts = <String, List<Floor>>{
+      for (final entry in floorsByHouse.entries)
+        entry.key: [
+          for (final floor in entry.value.values)
+            Floor(
+              id: floor.id,
+              houseId: floor.houseId,
+              name: floor.name,
+              iconKey: floor.iconKey,
+              icon: floor.icon,
+              accentKey: floor.accentKey,
+              roomCount: roomsWithCounts[floor.id]?.length ?? 0,
+              deviceCount: (roomsWithCounts[floor.id] ?? const <Room>[])
+                  .fold(0, (sum, room) => sum + room.deviceCount),
+            ),
+        ],
+    };
+
     _syntheticTree = _SyntheticTree(
-      houses: houses.values.toList(),
-      floorsByHouse: {
-        for (final entry in floorsByHouse.entries)
-          entry.key: entry.value.values.toList(),
-      },
-      roomsByFloor: {
-        for (final entry in roomsByFloor.entries)
-          entry.key: entry.value.values.toList(),
-      },
+      houses: [
+        for (final house in houses.values)
+          House(
+            id: house.id,
+            name: house.name,
+            iconKey: house.iconKey,
+            icon: house.icon,
+            floorCount: floorsWithCounts[house.id]?.length ?? 0,
+            roomCount: (floorsWithCounts[house.id] ?? const <Floor>[])
+                .fold(0, (sum, floor) => sum + floor.roomCount),
+            deviceCount: (floorsWithCounts[house.id] ?? const <Floor>[])
+                .fold(0, (sum, floor) => sum + floor.deviceCount),
+          ),
+      ],
+      floorsByHouse: floorsWithCounts,
+      roomsByFloor: roomsWithCounts,
       devicesByRoom: devicesByRoom,
     );
   }
 
-  Future<DeviceConnectivity> _resolveConnectivity(
-    Map<String, dynamic> deviceRow,
-  ) async {
-    final deviceCode = deviceCodeFromRow(deviceRow);
-    final mac = macAddressFromRow(deviceRow);
-    if ((deviceCode == null || deviceCode.isEmpty) &&
-        (mac == null || mac.isEmpty)) {
-      return DeviceConnectivity.offline;
-    }
-
-    final filters = <String>[];
-    if (deviceCode != null && deviceCode.isNotEmpty) {
-      filters.add('device_id.eq.$deviceCode');
-    }
-    if (mac != null && mac.isNotEmpty) {
-      filters.add('mac_address.eq.$mac');
-    }
-
-    final row = await _client
+  /// Newest `livecom.updated_at` per device UUID for the signed-in user.
+  Future<Map<String, DateTime>> _latestLivecomByDevice(String userId) async {
+    final rows = await _client
         .from('livecom')
-        .select('updated_at')
-        .or(filters.join(','))
-        .order('updated_at', ascending: false)
-        .limit(1)
-        .maybeSingle();
+        .select('device_id, updated_at')
+        .eq('user_id', userId);
 
-    if (row == null) return DeviceConnectivity.offline;
+    final latest = <String, DateTime>{};
+    for (final raw in rows as List) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      final id = row['device_id'] as String?;
+      final stamp = row['updated_at'] as String?;
+      if (id == null || stamp == null) continue;
+      final at = DateTime.parse(stamp).toUtc();
+      final previous = latest[id];
+      if (previous == null || at.isAfter(previous)) latest[id] = at;
+    }
+    return latest;
+  }
 
-    final updatedAt = DateTime.parse(row['updated_at'] as String).toUtc();
-    final isOnline =
+  DeviceConnectivity _connectivityFrom(DateTime? updatedAt) {
+    if (updatedAt == null) return DeviceConnectivity.offline;
+    final fresh =
         DateTime.now().toUtc().difference(updatedAt) < _onlineThreshold;
-    return isOnline ? DeviceConnectivity.online : DeviceConnectivity.offline;
+    return fresh ? DeviceConnectivity.online : DeviceConnectivity.offline;
+  }
+
+  Future<DeviceConnectivity> _connectivityForDevice(String deviceId) async {
+    final userId = requireUserId(_client);
+    final livecom = await _latestLivecomByDevice(userId);
+    return _connectivityFrom(livecom[deviceId]);
   }
 
   @override
@@ -217,11 +257,15 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
       row['description'] as String?,
       presets,
     );
+    final totals = _countHouse(row);
     return House(
       id: row['id'] as String,
       name: row['name'] as String,
       iconKey: iconKey,
       icon: LocationPresets.iconForKey(iconKey, presets),
+      floorCount: totals.floors,
+      roomCount: totals.rooms,
+      deviceCount: totals.devices,
     );
   }
 
@@ -231,12 +275,15 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
       row['description'] as String?,
       presets,
     );
+    final totals = _countFloor(row);
     return Floor(
       id: row['id'] as String,
       houseId: row['home_id'] as String,
       name: row['name'] as String,
       iconKey: iconKey,
       icon: LocationPresets.iconForKey(iconKey, presets),
+      roomCount: totals.rooms,
+      deviceCount: totals.devices,
     );
   }
 
@@ -252,7 +299,44 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
       name: row['name'] as String,
       iconKey: iconKey,
       icon: LocationPresets.iconForKey(iconKey, presets),
+      deviceCount: _countDevices(row['device_types']),
     );
+  }
+
+  ({int floors, int rooms, int devices}) _countHouse(Map<String, dynamic> row) {
+    final floors = row['floors'];
+    if (floors is! List) return (floors: 0, rooms: 0, devices: 0);
+    var roomCount = 0;
+    var deviceCount = 0;
+    for (final floor in floors) {
+      if (floor is! Map) continue;
+      final totals = _countFloor(Map<String, dynamic>.from(floor));
+      roomCount += totals.rooms;
+      deviceCount += totals.devices;
+    }
+    return (floors: floors.length, rooms: roomCount, devices: deviceCount);
+  }
+
+  ({int rooms, int devices}) _countFloor(Map<String, dynamic> row) {
+    final rooms = row['rooms'];
+    if (rooms is! List) return (rooms: 0, devices: 0);
+    var deviceCount = 0;
+    for (final room in rooms) {
+      if (room is! Map) continue;
+      deviceCount += _countDevices(room['device_types']);
+    }
+    return (rooms: rooms.length, devices: deviceCount);
+  }
+
+  int _countDevices(dynamic deviceTypes) {
+    if (deviceTypes is! List) return 0;
+    var count = 0;
+    for (final type in deviceTypes) {
+      if (type is! Map) continue;
+      final devices = type['devices'];
+      if (devices is List) count += devices.length;
+    }
+    return count;
   }
 
   @override
@@ -317,7 +401,12 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
   Future<List<Device>> getDevices(String roomId) async {
     if (_useSynthetic || isSyntheticId(roomId)) {
       await getHouses();
-      return _syntheticTree?.devicesByRoom[roomId] ?? [];
+      final cached = _syntheticTree?.devicesByRoom[roomId] ?? [];
+      final livecom = await _latestLivecomByDevice(requireUserId(_client));
+      return [
+        for (final device in cached)
+          device.copyWith(connectivity: _connectivityFrom(livecom[device.id])),
+      ];
     }
 
     final rows = await _client
@@ -325,18 +414,17 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
         .select('*, device_types!inner(name, room_id)')
         .eq('device_types.room_id', roomId);
 
-    final devices = <Device>[];
-    for (final row in rows) {
-      final connectivity = await _resolveConnectivity(row);
-      devices.add(
+    final livecom = await _latestLivecomByDevice(requireUserId(_client));
+    return [
+      for (final raw in rows)
         mapDeviceRow(
-          Map<String, dynamic>.from(row),
+          Map<String, dynamic>.from(raw as Map),
           roomId: roomId,
-          connectivity: connectivity,
+          connectivity: _connectivityFrom(
+            livecom[raw['id'] as String],
+          ),
         ),
-      );
-    }
-    return devices;
+    ];
   }
 
   @override
@@ -371,7 +459,7 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
     }
 
     final connectivity = includeConnectivity
-        ? await _resolveConnectivity(row)
+        ? await _connectivityForDevice(deviceId)
         : DeviceConnectivity.offline;
     return mapDeviceRow(
       Map<String, dynamic>.from(row),

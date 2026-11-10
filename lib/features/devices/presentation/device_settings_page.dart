@@ -10,6 +10,8 @@ import '../../../core/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
+import 'widgets/device_settings_header.dart';
+import 'widgets/favorite_device_button.dart';
 import 'widgets/settings_grid_tile.dart';
 
 /// Device settings hub ("Geräteeinstellungen"): a 3-column grid of category
@@ -208,10 +210,11 @@ class DeviceSettingsPage extends ConsumerWidget {
       ),
       body: AppScrollView(
         children: [
-          const SectionHeaderCard(
+          DeviceSettingsHeader(
+            deviceId: deviceId,
             title: 'Gerät Einstellungen',
             icon: Symbols.settings_suggest,
-            filled: true,
+            trailing: FavoriteDeviceButton(deviceId: deviceId),
           ),
           GridView.count(
             shrinkWrap: true,

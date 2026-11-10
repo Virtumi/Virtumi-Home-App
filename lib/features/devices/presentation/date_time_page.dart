@@ -66,6 +66,7 @@ class _DateTimePageState extends ConsumerState<DateTimePage> {
           return AppScrollView(
             children: [
               DateTimeSettingsForm(
+                deviceId: widget.deviceId,
                 config: draft,
                 enabled: _editing,
                 onChanged: (updated) => setState(() => _draft = updated),

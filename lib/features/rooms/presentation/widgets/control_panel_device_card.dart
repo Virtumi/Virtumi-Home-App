@@ -6,9 +6,11 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../../core/theme/theme.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../../shared/application/direct_device_link.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/repository_providers.dart';
 import 'device_card_text_styles.dart';
+import 'device_online_badge.dart';
 
 /// Room card for control panel devices: header actions plus Links/Mitte/Rechts
 /// zone selector with cloud button press (cp_btn_requests).
@@ -75,6 +77,7 @@ class _ControlPanelDeviceCardState extends ConsumerState<ControlPanelDeviceCard>
   @override
   Widget build(BuildContext context) {
     final primary = context.colors.primary;
+    final online = deviceIsOnline(ref, widget.device);
 
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.containerPadding),
@@ -109,7 +112,9 @@ class _ControlPanelDeviceCardState extends ConsumerState<ControlPanelDeviceCard>
                   ],
                 ),
               ),
-              if (widget.showSettingsButton) ...[
+              DeviceOnlineBadge(device: widget.device),
+              if (online && widget.showSettingsButton) ...[
+                const SizedBox(width: AppSpacing.sm),
                 NeumorphicIconButton(
                   icon: Symbols.settings,
                   iconColor: context.colors.onSurface,
@@ -119,12 +124,15 @@ class _ControlPanelDeviceCardState extends ConsumerState<ControlPanelDeviceCard>
                   onPressed: widget.onOpenSettings,
                 ),
               ],
-              if (widget.showSettingsButton && widget.showDetailsButton)
+              if (online &&
+                  widget.showSettingsButton &&
+                  widget.showDetailsButton)
                 const SizedBox(width: AppSpacing.sm),
-              if (widget.showDetailsButton)
+              if (online && widget.showDetailsButton)
                 _PrimaryNavButton(onPressed: widget.onOpenDetails),
             ],
           ),
+          if (online) ...[
           const SizedBox(height: AppSpacing.lg),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -150,6 +158,7 @@ class _ControlPanelDeviceCardState extends ConsumerState<ControlPanelDeviceCard>
               ),
             ],
           ),
+          ],
         ],
       ),
     );

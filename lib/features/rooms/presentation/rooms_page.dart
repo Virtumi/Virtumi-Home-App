@@ -7,6 +7,7 @@ import '../../../core/extensions/accent_resolver.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../shared/application/location_breadcrumb.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
@@ -63,8 +64,13 @@ class _RoomsPageState extends ConsumerState<RoomsPage> {
       ),
       body: AppScrollView(
         children: [
-          const SectionHeaderCard(
+          SectionHeaderCard(
             title: 'Räume',
+            subtitle: locationBreadcrumb(
+              ref,
+              floorId: widget.floorId,
+              includeFloor: true,
+            ),
             icon: Symbols.meeting_room,
             accent: AppColors.accentCyan,
             filled: true,

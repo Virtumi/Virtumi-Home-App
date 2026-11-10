@@ -9,6 +9,7 @@ import '../../../shared/models/models.dart';
 import '../../../shared/providers/connection_mode_provider.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
+import 'widgets/device_settings_header.dart';
 import 'widgets/matter_action_card.dart';
 import 'widgets/matter_pairing_status_card.dart';
 import 'widgets/matter_qr_pairing_card.dart';
@@ -101,9 +102,9 @@ class MatterPage extends ConsumerWidget {
         data: (config) {
           return AppScrollView(
             children: [
-              SectionHeaderCard(
+              DeviceSettingsHeader(
+                deviceId: deviceId,
                 title: 'Matter',
-                subtitle: 'Smart-Home-Standard',
                 imageAsset: AppConstants.matterLogoAsset,
                 accent: AppColors.accentCyan,
               ),

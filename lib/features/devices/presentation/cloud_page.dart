@@ -8,6 +8,7 @@ import '../../../core/theme/theme.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
+import 'widgets/device_settings_header.dart';
 
 /// Cloud hub ("Cloud Einstellungen"): entry points to Virtumi Cloud and MQTT.
 class CloudPage extends ConsumerWidget {
@@ -27,12 +28,11 @@ class CloudPage extends ConsumerWidget {
         onRetry: () => ref.invalidate(cloudConfigProvider(deviceId)),
         data: (cloud) => AppScrollView(
           children: [
-            const SectionHeaderCard(
+            DeviceSettingsHeader(
+              deviceId: deviceId,
               title: 'Cloud',
-              subtitle: 'Verbindung & Synchronisierung',
               icon: Symbols.cloud,
               accent: AppColors.accentSky,
-              filled: true,
             ),
             const AppSectionLabel('Dienste'),
             GroupedListCard(

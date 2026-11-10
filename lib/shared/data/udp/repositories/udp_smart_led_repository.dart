@@ -6,29 +6,44 @@ import '../udp_device_service.dart';
 import '../udp_mappers.dart';
 
 class UdpSmartLedRepository implements SmartLedRepository {
-  UdpSmartLedRepository(this._udp, this._endpoints);
+  UdpSmartLedRepository(
+    this._udp,
+    this._endpoints, {
+    this.onLink,
+  });
 
   final UdpDeviceService _udp;
   final DeviceEndpointResolver _endpoints;
 
+  /// Reports whether the device answered a UDP read.
+  final void Function(String deviceId, bool online)? onLink;
+
   static const _readTimeout = Duration(seconds: 2);
+
+  void _report(String deviceId, bool online) => onLink?.call(deviceId, online);
 
   @override
   Future<List<SmartLedStrip>> getStrips(String deviceId) async {
-    final ep = await _endpoints.resolve(deviceId);
-
-    return Future.wait([
-      for (final ledIndex in [1, 2, 3])
-        _readStripOrDefault(
-          ep.ipAddress,
-          ep.port,
-          ep.deviceCode,
-          ledIndex,
-        ),
-    ]);
+    try {
+      final ep = await _endpoints.resolve(deviceId);
+      final results = await Future.wait([
+        for (final ledIndex in [1, 2, 3])
+          _readStripOrDefault(
+            ep.ipAddress,
+            ep.port,
+            ep.deviceCode,
+            ledIndex,
+          ),
+      ]);
+      _report(deviceId, results.any((result) => result.ok));
+      return [for (final result in results) result.strip];
+    } catch (_) {
+      _report(deviceId, false);
+      rethrow;
+    }
   }
 
-  Future<SmartLedStrip> _readStripOrDefault(
+  Future<({bool ok, SmartLedStrip strip})> _readStripOrDefault(
     String ip,
     int port,
     String deviceCode,
@@ -42,9 +57,9 @@ class UdpSmartLedRepository implements SmartLedRepository {
         ledIndex: ledIndex,
         timeout: _readTimeout,
       );
-      return mapSmartLedStripFromUdp(json);
+      return (ok: true, strip: mapSmartLedStripFromUdp(json));
     } catch (_) {
-      return SmartLedStrip(ledIndex: ledIndex);
+      return (ok: false, strip: SmartLedStrip(ledIndex: ledIndex));
     }
   }
 
@@ -69,15 +84,21 @@ class UdpSmartLedRepository implements SmartLedRepository {
 
   @override
   Future<List<SmartLedTrigger>> getTriggers(String deviceId) async {
-    final ep = await _endpoints.resolve(deviceId);
-
-    return Future.wait([
-      for (var i = 0; i < 10; i++)
-        _readTriggerOrDefault(ep.ipAddress, ep.port, ep.deviceCode, i),
-    ]);
+    try {
+      final ep = await _endpoints.resolve(deviceId);
+      final results = await Future.wait([
+        for (var i = 0; i < 10; i++)
+          _readTriggerOrDefault(ep.ipAddress, ep.port, ep.deviceCode, i),
+      ]);
+      _report(deviceId, results.any((result) => result.ok));
+      return [for (final result in results) result.trigger];
+    } catch (_) {
+      _report(deviceId, false);
+      rethrow;
+    }
   }
 
-  Future<SmartLedTrigger> _readTriggerOrDefault(
+  Future<({bool ok, SmartLedTrigger trigger})> _readTriggerOrDefault(
     String ip,
     int port,
     String deviceCode,
@@ -90,9 +111,9 @@ class UdpSmartLedRepository implements SmartLedRepository {
         deviceCode: deviceCode,
         triggerIndex: index,
       );
-      return mapSmartLedTriggerFromUdp(json, index);
+      return (ok: true, trigger: mapSmartLedTriggerFromUdp(json, index));
     } catch (_) {
-      return SmartLedTrigger(parameterIndex: index);
+      return (ok: false, trigger: SmartLedTrigger(parameterIndex: index));
     }
   }
 

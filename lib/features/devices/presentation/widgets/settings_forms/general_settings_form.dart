@@ -5,6 +5,7 @@ import '../../../../../core/theme/theme.dart';
 import '../../../../../core/widgets/widgets.dart';
 import '../../../../../shared/models/models.dart';
 import '../brightness_control.dart';
+import '../device_settings_header.dart';
 import '../led_color_palette.dart';
 import '../led_schedule_section.dart';
 
@@ -19,6 +20,7 @@ class GeneralSettingsForm extends StatelessWidget {
     this.showSmartLedBanner = false,
     this.onSmartLedTap,
     this.footer,
+    this.deviceId,
   });
 
   final GeneralConfig config;
@@ -30,6 +32,9 @@ class GeneralSettingsForm extends StatelessWidget {
   final VoidCallback? onSmartLedTap;
   final Widget? footer;
 
+  /// Set on the device settings page. The setup wizard leaves this empty.
+  final String? deviceId;
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -37,12 +42,19 @@ class GeneralSettingsForm extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeaderCard(
-          title: 'Allgemeine',
-          subtitle: 'LED & Anzeige',
-          icon: Symbols.settings,
-          filled: true,
-        ),
+        if (deviceId != null)
+          DeviceSettingsHeader(
+            deviceId: deviceId!,
+            title: 'Allgemeine',
+            icon: Symbols.settings,
+          )
+        else
+          const SectionHeaderCard(
+            title: 'Allgemeine',
+            subtitle: 'LED & Anzeige',
+            icon: Symbols.settings,
+            filled: true,
+          ),
         if (showSmartLedBanner && onSmartLedTap != null) ...[
           const SizedBox(height: AppSpacing.cardGap),
           ActionBannerCard(

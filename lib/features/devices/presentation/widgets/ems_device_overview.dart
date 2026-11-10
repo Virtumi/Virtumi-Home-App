@@ -6,9 +6,12 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/navigation/app_routes.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../../shared/application/direct_device_link.dart';
+import '../../../../shared/application/location_breadcrumb.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/data_providers.dart';
 import '../../../rooms/presentation/widgets/device_card_text_styles.dart';
+import '../../../rooms/presentation/widgets/device_online_badge.dart';
 import '../../../rooms/presentation/widgets/ems_climate_widgets.dart';
 import 'ems_history_chart.dart';
 
@@ -20,32 +23,40 @@ class EmsDeviceOverview extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final online = deviceIsOnline(ref, device);
     final readingAsync = ref.watch(emsSensorProvider(device.id));
     final reading = readingAsync.asData?.value ?? EmsSensorReading.empty;
     final quality = reading.airQuality;
     final qualityColor = emsAirQualityColor(context, quality);
     final goodAir = reading.ventilationAdvice.startsWith('Optimale');
 
+    final header = SectionHeaderCard(
+      title: 'Luftqualität im Raum',
+      subtitle: locationBreadcrumb(
+        ref,
+        roomId: device.roomId,
+        includeFloor: true,
+        includeRoom: true,
+      ),
+      icon: Symbols.air,
+      accent: context.palette.accentTeal,
+      filled: true,
+      trailing: NeumorphicIconButton(
+        icon: Symbols.settings,
+        iconColor: context.colors.onSurface,
+        size: 40,
+        iconSize: 20,
+        tooltip: 'Geräteeinstellungen',
+        onPressed: () => context.push(Paths.deviceSettings(device.id)),
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeaderCard(
-          title: 'Luftqualität im Raum',
-          subtitle: device.displayName,
-          icon: Symbols.air,
-          accent: context.palette.accentTeal,
-          filled: true,
-          trailing: NeumorphicIconButton(
-            icon: Symbols.settings,
-            iconColor: context.colors.onSurface,
-            size: 40,
-            iconSize: 20,
-            tooltip: 'Geräteeinstellungen',
-            onPressed: () => context.push(Paths.deviceSettings(device.id)),
-          ),
-        ),
+        header,
         const SizedBox(height: AppSpacing.cardGap),
-        if (readingAsync.isLoading && !readingAsync.hasValue) ...[
+        if (online && readingAsync.isLoading && !readingAsync.hasValue) ...[
           const Align(
             alignment: Alignment.centerRight,
             child: SizedBox(
@@ -80,15 +91,18 @@ class EmsDeviceOverview extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: AppSpacing.sm),
+                  DeviceOnlineBadge(device: device),
                 ],
               ),
-              if (quality.detail.isNotEmpty) ...[
+              if (online && quality.detail.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   quality.detail,
                   style: DeviceCardTextStyles.subtitle(context),
                 ),
               ],
+              if (online) ...[
               const SizedBox(height: AppSpacing.lg),
               EmsAirQualityScale(reading: reading),
               if (reading.isStabilizing || reading.isRunInActive) ...[
@@ -151,9 +165,11 @@ class EmsDeviceOverview extends ConsumerWidget {
                   ],
                 ),
               ),
+              ],
             ],
           ),
         ),
+        if (online) ...[
         const SizedBox(height: AppSpacing.lg),
         const AppSectionLabel('Klimamesswerte'),
         _ClimateTile(
@@ -219,6 +235,7 @@ class EmsDeviceOverview extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.cardGap),
         EmsHistoryChart(deviceId: device.id),
+        ],
       ],
     );
   }

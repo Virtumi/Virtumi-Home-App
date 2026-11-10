@@ -10,6 +10,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
+import 'widgets/device_settings_header.dart';
 import 'widgets/network_category_nav.dart';
 import 'widgets/network_field_card.dart';
 
@@ -647,11 +648,10 @@ class _NetworkPageState extends ConsumerState<NetworkPage> {
 
           return AppScrollView(
             children: [
-              const SectionHeaderCard(
+              DeviceSettingsHeader(
+                deviceId: widget.deviceId,
                 title: 'Netzwerk Konfiguration',
-                subtitle: 'WLAN, AP & Station',
                 icon: Symbols.wifi,
-                filled: true,
               ),
               NetworkCategoryNav(
                 selected: _mainCategory,

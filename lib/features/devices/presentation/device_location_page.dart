@@ -72,6 +72,7 @@ class _DeviceLocationPageState extends ConsumerState<DeviceLocationPage> {
           return AppScrollView(
             children: [
               DeviceLocationForm(
+                deviceId: widget.deviceId,
                 location: display,
                 lockDeviceName: lockName,
                 enabled: _editing,

@@ -8,7 +8,10 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../shared/application/direct_device_link.dart';
+import '../../../shared/application/location_breadcrumb.dart';
 import '../../../shared/models/models.dart';
+import '../../../shared/providers/connection_mode_provider.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
 import '../../rooms/presentation/widgets/control_panel_device_card.dart';
@@ -34,6 +37,8 @@ class _DeviceDetailsPageState extends ConsumerState<DeviceDetailsPage> {
   int _ledRefreshGeneration = 0;
   int _emsPollTicks = 0;
   int _emsHistoryTicks = 0;
+  int _cloudStatusTicks = 0;
+  bool _probing = false;
 
   @override
   void initState() {
@@ -58,6 +63,28 @@ class _DeviceDetailsPageState extends ConsumerState<DeviceDetailsPage> {
     final deviceAsync = ref.read(deviceProvider(id));
     if (deviceAsync.isLoading) return;
     final type = deviceAsync.value?.type;
+    final direct = ref.read(isDirectConnectionProvider);
+    if (direct &&
+        type != null &&
+        type != DeviceType.light &&
+        type != DeviceType.environmentMonitor &&
+        !_probing) {
+      _probing = true;
+      unawaited(
+        probeDirectDeviceLink(
+          link: ref.read(directDeviceLinkProvider.notifier),
+          resolver: ref.read(deviceEndpointResolverProvider),
+          udp: ref.read(udpDeviceServiceProvider),
+          deviceId: id,
+        ).whenComplete(() => _probing = false),
+      );
+    } else if (!direct) {
+      _cloudStatusTicks++;
+      if (_cloudStatusTicks >= 30) {
+        _cloudStatusTicks = 0;
+        ref.invalidate(deviceProvider(id));
+      }
+    }
     if (type == DeviceType.light) {
       final strips = smartLedStripsProvider(id);
       if (ref.exists(strips) && ref.read(strips).isLoading) return;
@@ -98,6 +125,7 @@ class _DeviceDetailsPageState extends ConsumerState<DeviceDetailsPage> {
       _emsPollTicks = 0;
       _emsHistoryTicks = 0;
     }
+    _cloudStatusTicks = 0;
   }
 
   @override
@@ -159,7 +187,12 @@ class _DeviceDetailsPageState extends ConsumerState<DeviceDetailsPage> {
               else ...[
                 SectionHeaderCard(
                   title: device.displayName,
-                  subtitle: device.type.label,
+                  subtitle: locationBreadcrumb(
+                    ref,
+                    roomId: device.roomId,
+                    includeFloor: true,
+                    includeRoom: true,
+                  ),
                   icon: device.type.icon,
                   filled: true,
                   trailing: device.type == DeviceType.controlPanel ||
@@ -216,7 +249,6 @@ class _DeviceControlCard extends ConsumerWidget {
         showDetailsButton: false,
         showSettingsButton: false,
         showExtendedEffectControls: true,
-        showOfflineStatus: false,
         refreshGeneration: ledRefreshGeneration,
         onOpenDetails: () {},
         onOpenSettings: () {},

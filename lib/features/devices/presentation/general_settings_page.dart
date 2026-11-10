@@ -120,6 +120,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
           return AppScrollView(
             children: [
               GeneralSettingsForm(
+                deviceId: widget.deviceId,
                 config: draft,
                 enabled: _editing,
                 onChanged: (updated) => setState(() => _draft = updated),

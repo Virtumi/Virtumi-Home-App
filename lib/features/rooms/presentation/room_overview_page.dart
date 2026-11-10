@@ -12,8 +12,11 @@ import '../../../core/supabase/realtime_service.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../shared/application/direct_device_link.dart';
+import '../../../shared/application/location_breadcrumb.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/providers/data_providers.dart';
+import '../../../shared/providers/connection_mode_provider.dart';
 import '../../../shared/providers/repository_providers.dart';
 import '../application/room_devices_controller.dart';
 import 'widgets/control_panel_device_card.dart';
@@ -45,6 +48,13 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
   /// Counts 1-second ticks so EMS samples refresh about every 5 seconds.
   int _emsPollTicks = 0;
 
+  /// Counts 1-second ticks so cloud online/offline is rechecked about every
+  /// 30 seconds in rooms that are not already reloaded for Smart LED.
+  int _cloudStatusTicks = 0;
+
+  /// Device ids with a direct-mode presence probe still in flight.
+  final _probing = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +81,15 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
       for (final device in devices)
         if (device.type == DeviceType.environmentMonitor) device,
     ];
+    if (ref.read(isDirectConnectionProvider)) {
+      _probeSilentDevices(devices);
+    } else if (lights.isEmpty) {
+      _cloudStatusTicks++;
+      if (_cloudStatusTicks >= 30) {
+        _cloudStatusTicks = 0;
+        ref.invalidate(roomDevicesControllerProvider(widget.roomId));
+      }
+    }
     if (lights.isEmpty && monitors.isEmpty) return;
 
     if (lights.isNotEmpty && !_lightsBusy(lights)) {
@@ -85,6 +104,25 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
     _emsPollTicks = 0;
     for (final device in monitors) {
       ref.invalidate(emsSensorProvider(device.id));
+    }
+  }
+
+  void _probeSilentDevices(List<Device> devices) {
+    for (final device in devices) {
+      if (device.type == DeviceType.light ||
+          device.type == DeviceType.environmentMonitor) {
+        continue;
+      }
+      if (_probing.contains(device.id)) continue;
+      _probing.add(device.id);
+      unawaited(
+        probeDirectDeviceLink(
+          link: ref.read(directDeviceLinkProvider.notifier),
+          resolver: ref.read(deviceEndpointResolverProvider),
+          udp: ref.read(udpDeviceServiceProvider),
+          deviceId: device.id,
+        ).whenComplete(() => _probing.remove(device.id)),
+      );
     }
   }
 
@@ -129,6 +167,7 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
       }
     }
     _emsPollTicks = 0;
+    _cloudStatusTicks = 0;
   }
 
   @override
@@ -167,6 +206,11 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
         children: [
           SectionHeaderCard(
             title: room?.name ?? 'Raum',
+            subtitle: locationBreadcrumb(
+              ref,
+              roomId: widget.roomId,
+              includeFloor: true,
+            ),
             icon: room?.icon ?? Symbols.meeting_room,
             accent: room == null ? null : context.accent(room.accentKey),
             filled: true,
@@ -208,10 +252,11 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
               }
               final controller =
                   ref.read(roomDevicesControllerProvider(widget.roomId).notifier);
+              final ordered = _sortedRoomDevices(devices);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final device in devices) ...[
+                  for (final device in ordered) ...[
                     if (device.type == DeviceType.controlPanel)
                       ControlPanelDeviceCard(
                         device: device,
@@ -234,7 +279,6 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
                         key: ValueKey(device.id),
                         device: device,
                         showEffectPicker: false,
-                        showOfflineStatus: false,
                         refreshGeneration: _ledRefreshGeneration,
                         onOpenDetails: () =>
                             context.push(Paths.deviceDetails(device.id)),
@@ -253,7 +297,7 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
                       ),
                     const SizedBox(height: AppSpacing.cardGap),
                   ],
-                  RoomSummaryGrid(devices: devices),
+                  RoomSummaryGrid(devices: ordered),
                 ],
               );
             },
@@ -262,4 +306,29 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
       ),
     );
   }
+}
+
+/// Room cards: Raumklima, Smart LED, Smart Switch, Smart Blinds, Control Panel.
+/// Devices of the same kind keep their previous order.
+List<Device> _sortedRoomDevices(List<Device> devices) {
+  final indexed = devices.indexed.toList();
+  indexed.sort((a, b) {
+    final rank = _roomDeviceRank(a.$2).compareTo(_roomDeviceRank(b.$2));
+    if (rank != 0) return rank;
+    return a.$1.compareTo(b.$1);
+  });
+  return [for (final entry in indexed) entry.$2];
+}
+
+int _roomDeviceRank(Device device) {
+  if (device.type == DeviceType.environmentMonitor) return 0;
+  if (device.type == DeviceType.light) return 1;
+
+  final firmware = CpDeviceType.fromDeviceTypeName(device.model);
+  return switch (firmware) {
+    CpDeviceType.smartSwitch => 2,
+    CpDeviceType.louver => 3,
+    CpDeviceType.controlPanel => 4,
+    _ => device.type == DeviceType.controlPanel ? 4 : 5,
+  };
 }
