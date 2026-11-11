@@ -20,7 +20,9 @@ import '../../../shared/providers/connection_mode_provider.dart';
 import '../../../shared/providers/repository_providers.dart';
 import '../application/room_devices_controller.dart';
 import 'widgets/control_panel_device_card.dart';
+import 'widgets/device_card_text_styles.dart';
 import 'widgets/device_control_card.dart';
+import 'widgets/device_online_badge.dart';
 import 'widgets/ems_room_card.dart';
 import 'widgets/smart_led_device_card.dart';
 import 'widgets/room_summary_grid.dart';
@@ -54,6 +56,29 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
 
   /// Device ids with a direct-mode presence probe still in flight.
   final _probing = <String>{};
+
+  /// True shows the existing control cards. False shows the compact status cards.
+  var _roomCards = true;
+  var _grouping = _RoomGrouping.none;
+  final _collapsed = <String>{};
+
+  Future<void> _pickGrouping() async {
+    final picked = await showOptionPicker<_RoomGrouping>(
+      context: context,
+      title: 'Sortierung',
+      options: _RoomGrouping.values,
+      selected: _grouping,
+      labelOf: (option) => switch (option) {
+        _RoomGrouping.none => 'Ohne Gruppierung',
+        _RoomGrouping.type => 'Nach Gerätetyp',
+      },
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _grouping = picked;
+      _collapsed.clear();
+    });
+  }
 
   @override
   void initState() {
@@ -197,6 +222,14 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
     final roomAsync = ref.watch(roomProvider(widget.roomId));
     final devicesAsync = ref.watch(roomDevicesControllerProvider(widget.roomId));
     final room = roomAsync.value;
+    final hasDevices = devicesAsync.value?.isNotEmpty ?? false;
+    final accent = room == null ? null : context.accent(room.accentKey);
+    final place = locationBreadcrumb(
+      ref,
+      roomId: widget.roomId,
+      includeFloor: true,
+      includeRoom: true,
+    );
 
     return AppScaffold(
       header: AppHeader(
@@ -212,8 +245,27 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
               includeFloor: true,
             ),
             icon: room?.icon ?? Symbols.meeting_room,
-            accent: room == null ? null : context.accent(room.accentKey),
+            accent: accent,
             filled: true,
+            trailing: hasDevices
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      NeumorphicIconButton(
+                        icon: Symbols.filter_list,
+                        tooltip: 'Sortierung',
+                        onPressed: _pickGrouping,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      _ViewSwitch(
+                        roomCards: _roomCards,
+                        accent: accent ?? context.colors.primary,
+                        onPressed: () =>
+                            setState(() => _roomCards = !_roomCards),
+                      ),
+                    ],
+                  )
+                : null,
           ),
           devicesAsync.when(
             skipLoadingOnReload: true,
@@ -256,47 +308,41 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final device in ordered) ...[
-                    if (device.type == DeviceType.controlPanel)
-                      ControlPanelDeviceCard(
-                        device: device,
-                        onOpenDetails: () =>
-                            context.push(Paths.deviceDetails(device.id)),
-                        onOpenSettings: () =>
-                            context.push(Paths.deviceSettings(device.id)),
-                      )
-                    else if (device.type == DeviceType.environmentMonitor)
-                      EmsRoomCard(
-                        key: ValueKey(device.id),
-                        device: device,
-                        onOpenDetails: () =>
-                            context.push(Paths.deviceDetails(device.id)),
-                        onOpenSettings: () =>
-                            context.push(Paths.deviceSettings(device.id)),
-                      )
-                    else if (device.type == DeviceType.light)
-                      SmartLedDeviceCard(
-                        key: ValueKey(device.id),
-                        device: device,
-                        showEffectPicker: false,
-                        refreshGeneration: _ledRefreshGeneration,
-                        onOpenDetails: () =>
-                            context.push(Paths.deviceDetails(device.id)),
-                        onOpenSettings: () =>
-                            context.push(Paths.deviceSettings(device.id)),
-                      )
-                    else
-                      DeviceControlCard(
-                        device: device,
-                        onOpenDetails: () =>
-                            context.push(Paths.deviceDetails(device.id)),
-                        onOpenSettings: () =>
-                            context.push(Paths.deviceSettings(device.id)),
+                  if (_grouping == _RoomGrouping.none)
+                    for (final device in ordered) ...[
+                      _deviceCard(
+                        context,
+                        device,
+                        place: place ?? '',
                         onTogglePower: (value) =>
                             controller.togglePower(device.id, value),
                       ),
-                    const SizedBox(height: AppSpacing.cardGap),
-                  ],
+                      const SizedBox(height: AppSpacing.cardGap),
+                    ]
+                  else
+                    for (final group in _typeGroups(ordered)) ...[
+                      _GroupCard(
+                        title: group.title,
+                        count: group.devices.length,
+                        expanded: !_collapsed.contains(group.title),
+                        onToggle: () => setState(() {
+                          if (!_collapsed.add(group.title)) {
+                            _collapsed.remove(group.title);
+                          }
+                        }),
+                        children: [
+                          for (final device in group.devices)
+                            _deviceCard(
+                              context,
+                              device,
+                              place: place ?? '',
+                              onTogglePower: (value) =>
+                                  controller.togglePower(device.id, value),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.cardGap),
+                    ],
                   RoomSummaryGrid(devices: ordered),
                 ],
               );
@@ -306,6 +352,83 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
       ),
     );
   }
+
+  Widget _deviceCard(
+    BuildContext context,
+    Device device, {
+    required String place,
+    required ValueChanged<bool> onTogglePower,
+  }) {
+    if (!_roomCards) {
+      return _RoomStatusCard(device: device, locationPath: place);
+    }
+
+    void openDetails() => context.push(Paths.deviceDetails(device.id));
+    void openSettings() => context.push(Paths.deviceSettings(device.id));
+
+    if (device.type == DeviceType.controlPanel) {
+      return ControlPanelDeviceCard(
+        device: device,
+        onOpenDetails: openDetails,
+        onOpenSettings: openSettings,
+      );
+    }
+    if (device.type == DeviceType.environmentMonitor) {
+      return EmsRoomCard(
+        key: ValueKey(device.id),
+        device: device,
+        onOpenDetails: openDetails,
+        onOpenSettings: openSettings,
+      );
+    }
+    if (device.type == DeviceType.light) {
+      return SmartLedDeviceCard(
+        key: ValueKey(device.id),
+        device: device,
+        showEffectPicker: false,
+        refreshGeneration: _ledRefreshGeneration,
+        onOpenDetails: openDetails,
+        onOpenSettings: openSettings,
+      );
+    }
+    return DeviceControlCard(
+      device: device,
+      onOpenDetails: openDetails,
+      onOpenSettings: openSettings,
+      onTogglePower: onTogglePower,
+    );
+  }
+}
+
+enum _RoomGrouping { none, type }
+
+class _RoomTypeGroup {
+  _RoomTypeGroup({required this.title, required this.rank});
+
+  final String title;
+  final int rank;
+  final devices = <Device>[];
+}
+
+List<_RoomTypeGroup> _typeGroups(List<Device> devices) {
+  final buckets = <String, _RoomTypeGroup>{};
+  for (final device in devices) {
+    final info = _roomTypeGroup(device);
+    buckets
+        .putIfAbsent(
+          info.label,
+          () => _RoomTypeGroup(title: info.label, rank: info.rank),
+        )
+        .devices
+        .add(device);
+  }
+  final groups = buckets.values.toList();
+  groups.sort((a, b) {
+    final byRank = a.rank.compareTo(b.rank);
+    if (byRank != 0) return byRank;
+    return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+  });
+  return groups;
 }
 
 /// Room cards: Raumklima, Smart LED, Smart Switch, Smart Blinds, Control Panel.
@@ -320,15 +443,191 @@ List<Device> _sortedRoomDevices(List<Device> devices) {
   return [for (final entry in indexed) entry.$2];
 }
 
-int _roomDeviceRank(Device device) {
-  if (device.type == DeviceType.environmentMonitor) return 0;
-  if (device.type == DeviceType.light) return 1;
+int _roomDeviceRank(Device device) => _roomTypeGroup(device).rank;
+
+({int rank, String label}) _roomTypeGroup(Device device) {
+  if (device.type == DeviceType.environmentMonitor) {
+    return (rank: 0, label: emsCategoryLabel);
+  }
+  if (device.type == DeviceType.light) {
+    return (rank: 1, label: 'Smart LED');
+  }
 
   final firmware = CpDeviceType.fromDeviceTypeName(device.model);
   return switch (firmware) {
-    CpDeviceType.smartSwitch => 2,
-    CpDeviceType.louver => 3,
-    CpDeviceType.controlPanel => 4,
-    _ => device.type == DeviceType.controlPanel ? 4 : 5,
+    CpDeviceType.smartSwitch => (rank: 2, label: 'Smart Switch'),
+    CpDeviceType.louver => (rank: 3, label: 'Smart Blinds'),
+    CpDeviceType.controlPanel => (rank: 4, label: 'Control Panel'),
+    _ => device.type == DeviceType.controlPanel
+        ? (rank: 4, label: 'Control Panel')
+        : (rank: 5, label: device.type.label),
   };
+}
+
+class _GroupCard extends StatelessWidget {
+  const _GroupCard({
+    required this.title,
+    required this.count,
+    required this.expanded,
+    required this.onToggle,
+    required this.children,
+  });
+
+  final String title;
+  final int count;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: AppRadius.mdAll,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: context.text.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text('$count', style: context.text.bodySmall),
+                Icon(
+                  expanded ? Symbols.expand_less : Symbols.expand_more,
+                  color: context.colors.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+          if (expanded) ...[
+            const SizedBox(height: AppSpacing.md),
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) const SizedBox(height: AppSpacing.cardGap),
+              children[i],
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ViewSwitch extends StatelessWidget {
+  const _ViewSwitch({
+    required this.roomCards,
+    required this.accent,
+    required this.onPressed,
+  });
+
+  final bool roomCards;
+  final Color accent;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = roomCards ? 'Status' : 'Karten';
+    final tooltip = roomCards
+        ? 'Zur Statusansicht mit Online und Offline wechseln'
+        : 'Zu den Karten der Raumübersicht wechseln';
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: AppRadius.full,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: AppRadius.full,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Text(
+              label,
+              style: context.text.labelMedium?.copyWith(
+                color: accent,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoomStatusCard extends ConsumerWidget {
+  const _RoomStatusCard({required this.device, required this.locationPath});
+
+  final Device device;
+  final String locationPath;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final online = deviceIsOnline(ref, device);
+    final status = online ? 'Online' : 'Offline';
+    final statusColor =
+        online ? context.palette.statusOnline : context.colors.error;
+    final typeLabel = _roomTypeGroup(device).label;
+
+    return AppCard(
+      onTap: () => context.push(Paths.deviceDetails(device.id)),
+      child: Row(
+        children: [
+          IconBox(
+            icon: device.type.icon,
+            color: context.colors.primary,
+            size: AppSizes.iconBoxMd,
+            filled: true,
+          ),
+          const SizedBox(width: AppSpacing.gutter),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  device.displayName,
+                  style: DeviceCardTextStyles.title(context),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  typeLabel,
+                  style: DeviceCardTextStyles.subtitle(context),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (locationPath.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    locationPath,
+                    style: DeviceCardTextStyles.caption(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 2),
+                Text(
+                  status,
+                  style: DeviceCardTextStyles.caption(context, emphasis: true)
+                      .copyWith(color: statusColor),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          DeviceOnlineBadge(device: device),
+        ],
+      ),
+    );
+  }
 }

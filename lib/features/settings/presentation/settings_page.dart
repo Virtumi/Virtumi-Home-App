@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/navigation/app_routes.dart';
+import '../../../core/navigation/app_shell.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/security/app_lock_providers.dart';
 import '../../../core/security/app_lock_service.dart';
@@ -38,7 +39,17 @@ class SettingsPage extends ConsumerWidget {
     }
 
     return AppScaffold(
-      header: AppHeader(onBack: () => context.go(Paths.home)),
+      header: AppHeader(
+        onBack: () {
+          final shell = StatefulNavigationShell.maybeOf(context);
+          final returnIndex = ref.read(settingsReturnBranchProvider);
+          if (shell != null) {
+            shell.goBranch(returnIndex);
+            return;
+          }
+          context.go(Paths.home);
+        },
+      ),
       body: AsyncValueView<AppSettings?>(
         value: settingsAsync,
         onRetry: () => ref.invalidate(appSettingsProvider),

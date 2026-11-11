@@ -22,6 +22,16 @@ import '../../rooms/presentation/widgets/smart_led_device_card.dart';
 /// Saturated red matching the Favoriten tab in dark mode.
 const _favoriteRedDark = Color(0xFFFF4D5A);
 
+enum _FavoriteGrouping { none, room, type }
+
+class _FavoriteGroup {
+  _FavoriteGroup({required this.title, required this.rank});
+
+  final String title;
+  final int rank;
+  final entries = <RecentActivityEntry>[];
+}
+
 /// Favorites tab: saved devices as status cards or room-overview cards.
 class FavoritesPage extends ConsumerStatefulWidget {
   const FavoritesPage({super.key});
@@ -33,8 +43,29 @@ class FavoritesPage extends ConsumerStatefulWidget {
 class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   /// False shows the compact online/offline cards.
   var _roomCards = false;
+  var _grouping = _FavoriteGrouping.none;
+  final _collapsed = <String>{};
 
   final _power = <String, bool>{};
+
+  Future<void> _pickGrouping() async {
+    final picked = await showOptionPicker<_FavoriteGrouping>(
+      context: context,
+      title: 'Sortierung',
+      options: _FavoriteGrouping.values,
+      selected: _grouping,
+      labelOf: (option) => switch (option) {
+        _FavoriteGrouping.none => 'Ohne Gruppierung',
+        _FavoriteGrouping.room => 'Nach Raum',
+        _FavoriteGrouping.type => 'Nach Gerätetyp',
+      },
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _grouping = picked;
+      _collapsed.clear();
+    });
+  }
 
   Future<void> _togglePower(Device device, bool isOn) async {
     setState(() => _power[device.id] = isOn);
@@ -62,7 +93,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => AppScrollView(
           children: [
-            _header(accent, showSwitch: false),
+            _header(accent, showActions: false),
             const EmptyState(
               icon: Symbols.error,
               message: 'Etwas ist schiefgelaufen',
@@ -72,15 +103,30 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
         data: (entries) {
           return AppScrollView(
             children: [
-              _header(accent, showSwitch: entries.isNotEmpty),
+              _header(accent, showActions: entries.isNotEmpty),
               if (entries.isEmpty)
                 const EmptyState(
                   icon: Symbols.favorite,
                   message: 'Noch keine Favoriten gesetzt',
                 )
+              else if (_grouping == _FavoriteGrouping.none)
+                for (final entry in entries) _cardFor(context, entry)
               else
-                for (final entry in entries)
-                  _cardFor(context, entry),
+                for (final group in _groups(entries))
+                  _GroupCard(
+                    title: group.title,
+                    count: group.entries.length,
+                    expanded: !_collapsed.contains(group.title),
+                    onToggle: () => setState(() {
+                      if (!_collapsed.add(group.title)) {
+                        _collapsed.remove(group.title);
+                      }
+                    }),
+                    children: [
+                      for (final entry in group.entries)
+                        _cardFor(context, entry),
+                    ],
+                  ),
             ],
           );
         },
@@ -88,21 +134,60 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
     );
   }
 
-  Widget _header(Color accent, {required bool showSwitch}) {
+  Widget _header(Color accent, {required bool showActions}) {
     return SectionHeaderCard(
       title: 'Favoriten',
       icon: Symbols.favorite,
       subtitle: 'Gespeicherte Geräte',
       accent: accent,
       filled: true,
-      trailing: showSwitch
-          ? _ViewSwitch(
-              roomCards: _roomCards,
-              accent: accent,
-              onPressed: () => setState(() => _roomCards = !_roomCards),
+      trailing: showActions
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                NeumorphicIconButton(
+                  icon: Symbols.filter_list,
+                  tooltip: 'Sortierung',
+                  onPressed: _pickGrouping,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                _ViewSwitch(
+                  roomCards: _roomCards,
+                  accent: accent,
+                  onPressed: () => setState(() => _roomCards = !_roomCards),
+                ),
+              ],
             )
           : null,
     );
+  }
+
+  List<_FavoriteGroup> _groups(List<RecentActivityEntry> entries) {
+    final buckets = <String, _FavoriteGroup>{};
+    for (final entry in entries) {
+      final info = _grouping == _FavoriteGrouping.room
+          ? (
+              rank: 0,
+              label: entry.locationPath.trim().isEmpty
+                  ? 'Ohne Ort'
+                  : entry.locationPath.trim(),
+            )
+          : _typeGroup(entry.device);
+      buckets
+          .putIfAbsent(
+            info.label,
+            () => _FavoriteGroup(title: info.label, rank: info.rank),
+          )
+          .entries
+          .add(entry);
+    }
+    final groups = buckets.values.toList();
+    groups.sort((a, b) {
+      final byRank = a.rank.compareTo(b.rank);
+      if (byRank != 0) return byRank;
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+    return groups;
   }
 
   Widget _cardFor(BuildContext context, RecentActivityEntry entry) {
@@ -144,6 +229,85 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
       onOpenDetails: openDetails,
       onOpenSettings: openSettings,
       onTogglePower: (value) => unawaited(_togglePower(device, value)),
+    );
+  }
+}
+
+({int rank, String label}) _typeGroup(Device device) {
+  if (device.type == DeviceType.environmentMonitor) {
+    return (rank: 0, label: emsCategoryLabel);
+  }
+  if (device.type == DeviceType.light) {
+    return (rank: 1, label: 'Smart LED');
+  }
+
+  final firmware = CpDeviceType.fromDeviceTypeName(device.model);
+  return switch (firmware) {
+    CpDeviceType.smartSwitch => (rank: 2, label: 'Smart Switch'),
+    CpDeviceType.louver => (rank: 3, label: 'Smart Blinds'),
+    CpDeviceType.controlPanel => (rank: 4, label: 'Control Panel'),
+    _ => device.type == DeviceType.controlPanel
+        ? (rank: 4, label: 'Control Panel')
+        : (rank: 5, label: device.type.label),
+  };
+}
+
+class _GroupCard extends StatelessWidget {
+  const _GroupCard({
+    required this.title,
+    required this.count,
+    required this.expanded,
+    required this.onToggle,
+    required this.children,
+  });
+
+  final String title;
+  final int count;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: AppRadius.mdAll,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: context.text.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  '$count',
+                  style: context.text.bodySmall,
+                ),
+                Icon(
+                  expanded ? Symbols.expand_less : Symbols.expand_more,
+                  color: context.colors.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+          if (expanded) ...[
+            const SizedBox(height: AppSpacing.md),
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) const SizedBox(height: AppSpacing.cardGap),
+              children[i],
+            ],
+          ],
+        ],
+      ),
     );
   }
 }

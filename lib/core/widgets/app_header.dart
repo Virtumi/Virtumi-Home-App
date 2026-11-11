@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../theme/theme.dart';
+import 'app_scaffold.dart';
 import 'neumorphic_icon_button.dart';
 
 /// Shared screen header used on all detail screens.
@@ -41,48 +42,52 @@ class AppHeader extends StatelessWidget {
     final hasTrailing =
         trailing != null || onEdit != null || onRefresh != null;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.containerPadding,
-        AppSpacing.containerPadding,
-        AppSpacing.containerPadding,
-        AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          if (showBack)
-            NeumorphicIconButton(
-              icon: Symbols.chevron_left,
-              tooltip: 'Zurück',
-              onPressed: onBack ?? () => Navigator.of(context).maybePop(),
-            )
-          else
-            const SizedBox(width: AppSizes.headerButton),
-          const Spacer(),
-          if (hasTrailing)
-            trailing ??
-                Row(
-                  children: [
-                    if (onEdit != null)
-                      NeumorphicIconButton(
-                        icon: isEditing ? Symbols.close : Symbols.edit,
-                        tooltip: 'Bearbeiten',
-                        iconColor: isEditing
-                            ? context.colors.error
-                            : context.colors.primary,
-                        onPressed: onEdit,
-                      ),
-                    if (onEdit != null && onRefresh != null)
-                      const SizedBox(width: AppSpacing.gutter),
-                    if (onRefresh != null)
-                      NeumorphicIconButton(
-                        icon: Symbols.refresh,
-                        tooltip: 'Aktualisieren',
-                        onPressed: onRefresh,
-                      ),
-                  ],
-                ),
-        ],
+    return BackActionRegistration(
+      showBack: showBack,
+      onBack: onBack,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.containerPadding,
+          AppSpacing.containerPadding,
+          AppSpacing.containerPadding,
+          AppSpacing.sm,
+        ),
+        child: Row(
+          children: [
+            if (showBack)
+              NeumorphicIconButton(
+                icon: Symbols.chevron_left,
+                tooltip: 'Zurück',
+                onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+              )
+            else
+              const SizedBox(width: AppSizes.headerButton),
+            const Spacer(),
+            if (hasTrailing)
+              trailing ??
+                  Row(
+                    children: [
+                      if (onEdit != null)
+                        NeumorphicIconButton(
+                          icon: isEditing ? Symbols.close : Symbols.edit,
+                          tooltip: 'Bearbeiten',
+                          iconColor: isEditing
+                              ? context.colors.error
+                              : context.colors.primary,
+                          onPressed: onEdit,
+                        ),
+                      if (onEdit != null && onRefresh != null)
+                        const SizedBox(width: AppSpacing.gutter),
+                      if (onRefresh != null)
+                        NeumorphicIconButton(
+                          icon: Symbols.refresh,
+                          tooltip: 'Aktualisieren',
+                          onPressed: onRefresh,
+                        ),
+                    ],
+                  ),
+          ],
+        ),
       ),
     );
   }

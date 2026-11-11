@@ -6,6 +6,23 @@ import '../../shared/providers/data_providers.dart';
 import '../theme/theme.dart';
 import '../widgets/app_bottom_navigation.dart';
 
+/// Branch index to restore when leaving Einstellungen via the header back
+/// button (defaults to Home).
+class SettingsReturnBranch extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void remember(int branchIndex) {
+    if (branchIndex == _settingsBranchIndex) return;
+    state = branchIndex;
+  }
+}
+
+const _settingsBranchIndex = 3;
+
+final settingsReturnBranchProvider =
+    NotifierProvider<SettingsReturnBranch, int>(SettingsReturnBranch.new);
+
 /// Hosts the four primary tab branches and overlays the floating bottom
 /// navigation so it stays visible (and consistent) across nested drill-downs.
 class AppShell extends ConsumerWidget {
@@ -44,13 +61,18 @@ class AppShell extends ConsumerWidget {
   }
 
   void _onTap(int index, WidgetRef ref) {
+    final current = navigationShell.currentIndex;
+    if (index == _settingsBranchIndex && current != _settingsBranchIndex) {
+      ref.read(settingsReturnBranchProvider.notifier).remember(current);
+    }
+
     if (index == 0) {
       refreshHomeScreenData(ref);
     }
 
     navigationShell.goBranch(
       index,
-      initialLocation: index == navigationShell.currentIndex,
+      initialLocation: index == 0 || index == current,
     );
   }
 }
