@@ -19,6 +19,10 @@ class PreferencesService {
   static const String _recentDeviceIdsKey = 'recent_device_ids';
   static const String _recentHouseIdsKey = 'recent_house_ids';
   static const String _favoriteDeviceIdsPrefix = 'favorite_device_ids_';
+  static const String _favoritesViewPrefix = 'favorites_view_';
+  static const String _favoritesGroupingPrefix = 'favorites_grouping_';
+  static const String _roomViewPrefix = 'room_overview_view_';
+  static const String _roomGroupingPrefix = 'room_overview_grouping_';
   static const String _startRouteKeyPrefix = 'start_route_';
   static const String _appSettingsKeyPrefix = 'app_settings_';
 
@@ -53,6 +57,52 @@ class PreferencesService {
 
   Future<void> setFavoriteDeviceIds(String userId, List<String> ids) {
     return _prefs.setStringList('$_favoriteDeviceIdsPrefix$userId', ids);
+  }
+
+  /// True when Favoriten should open on the expanded card view.
+  /// Missing value means the compact status view.
+  bool favoritesShowsCards(String userId) =>
+      _prefs.getString('$_favoritesViewPrefix$userId') == 'cards';
+
+  /// `none`, `room` or `type`. Missing value means no grouping.
+  String favoritesGrouping(String userId) =>
+      _prefs.getString('$_favoritesGroupingPrefix$userId') ?? 'none';
+
+  Future<void> setFavoritesLayout(
+    String userId, {
+    required bool showCards,
+    required String grouping,
+  }) async {
+    await _prefs.setString(
+      '$_favoritesViewPrefix$userId',
+      showCards ? 'cards' : 'status',
+    );
+    await _prefs.setString('$_favoritesGroupingPrefix$userId', grouping);
+  }
+
+  /// True when this room should open on the expanded card view.
+  /// Missing value means the card view.
+  bool roomShowsCards(String userId, String roomId) {
+    final stored = _prefs.getString('$_roomViewPrefix${userId}_$roomId');
+    if (stored == null) return true;
+    return stored == 'cards';
+  }
+
+  /// `none` or `type`. Missing value means no grouping.
+  String roomGrouping(String userId, String roomId) =>
+      _prefs.getString('$_roomGroupingPrefix${userId}_$roomId') ?? 'none';
+
+  Future<void> setRoomLayout(
+    String userId,
+    String roomId, {
+    required bool showCards,
+    required String grouping,
+  }) async {
+    await _prefs.setString(
+      '$_roomViewPrefix${userId}_$roomId',
+      showCards ? 'cards' : 'status',
+    );
+    await _prefs.setString('$_roomGroupingPrefix${userId}_$roomId', grouping);
   }
 
   List<String> get recentHouseIds =>

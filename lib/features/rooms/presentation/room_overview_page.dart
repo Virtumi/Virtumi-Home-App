@@ -7,6 +7,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/extensions/accent_resolver.dart';
 import '../../../core/navigation/app_routes.dart';
+import '../../../core/services/preferences_service.dart';
 import '../../../core/supabase/realtime_guard.dart';
 import '../../../core/supabase/realtime_service.dart';
 import '../../../core/supabase/supabase_client.dart';
@@ -78,11 +79,39 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
       _grouping = picked;
       _collapsed.clear();
     });
+    _persistLayout();
+  }
+
+  String? get _userId =>
+      ref.read(supabaseClientProvider).auth.currentUser?.id;
+
+  void _restoreLayout() {
+    final userId = _userId;
+    if (userId == null) return;
+    final prefs = ref.read(preferencesServiceProvider);
+    _roomCards = prefs.roomShowsCards(userId, widget.roomId);
+    _grouping = prefs.roomGrouping(userId, widget.roomId) == 'type'
+        ? _RoomGrouping.type
+        : _RoomGrouping.none;
+  }
+
+  void _persistLayout() {
+    final userId = _userId;
+    if (userId == null) return;
+    unawaited(
+      ref.read(preferencesServiceProvider).setRoomLayout(
+            userId,
+            widget.roomId,
+            showCards: _roomCards,
+            grouping: _grouping.name,
+          ),
+    );
   }
 
   @override
   void initState() {
     super.initState();
+    _restoreLayout();
     _poll = Timer.periodic(const Duration(seconds: 1), (_) => _pollTick());
   }
 
@@ -253,15 +282,25 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
                     children: [
                       NeumorphicIconButton(
                         icon: Symbols.filter_list,
+                        size: 40,
+                        iconSize: 20,
                         tooltip: 'Sortierung',
                         onPressed: _pickGrouping,
                       ),
                       const SizedBox(width: AppSpacing.sm),
-                      _ViewSwitch(
-                        roomCards: _roomCards,
-                        accent: accent ?? context.colors.primary,
-                        onPressed: () =>
-                            setState(() => _roomCards = !_roomCards),
+                      NeumorphicIconButton(
+                        icon: _roomCards
+                            ? Symbols.unfold_less
+                            : Symbols.unfold_more,
+                        size: 40,
+                        iconSize: 20,
+                        tooltip: _roomCards
+                            ? 'Zur Statusansicht wechseln'
+                            : 'Zu den Karten wechseln',
+                        onPressed: () {
+                          setState(() => _roomCards = !_roomCards);
+                          _persistLayout();
+                        },
                       ),
                     ],
                   )
@@ -516,48 +555,6 @@ class _GroupCard extends StatelessWidget {
             ],
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _ViewSwitch extends StatelessWidget {
-  const _ViewSwitch({
-    required this.roomCards,
-    required this.accent,
-    required this.onPressed,
-  });
-
-  final bool roomCards;
-  final Color accent;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = roomCards ? 'Status' : 'Karten';
-    final tooltip = roomCards
-        ? 'Zur Statusansicht mit Online und Offline wechseln'
-        : 'Zu den Karten der Raumübersicht wechseln';
-
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: accent.withValues(alpha: 0.12),
-        borderRadius: AppRadius.full,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: AppRadius.full,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              label,
-              style: context.text.labelMedium?.copyWith(
-                color: accent,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

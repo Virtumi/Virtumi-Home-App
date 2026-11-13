@@ -77,8 +77,8 @@ class AppColors {
 
 /// Dark-mode palette from the Google Stitch "Aura Intelligence" reference.
 ///
-/// Uses tonal layering (anthracite base + elevated card surfaces) with subtle
-/// borders instead of heavy dual neumorphic shadows.
+/// Uses tonal layering (anthracite base + elevated card surfaces) combined with
+/// the same dual neumorphic shadows as the light theme.
 class AppColorsDark {
   AppColorsDark._();
 
@@ -126,10 +126,11 @@ class AppColorsDark {
   static const Color errorContainer = Color(0xFF93000A);
   static const Color onErrorContainer = Color(0xFFFFDAD6);
 
-  // --- Flat elevation (border + tonal contrast, no drop shadows) ---
+  // --- Neumorphic shadow pair (opaque on purpose: several widgets call
+  // `withValues(alpha: ...)` on these, which overrides the alpha channel) ---
   static const Color cardBorder = Color(0x1AFFFFFF);
-  static const Color shadowDark = Color(0xFF141414);
-  static const Color shadowLight = Color(0x1AFFFFFF);
+  static const Color shadowDark = Color(0xFF0B0B0B);
+  static const Color shadowLight = Color(0xFF2E2E2E);
 
   // --- Functional accents (turquoise-forward in dark) ---
   static const Color accentBlue = Color(0xFF64D2FF);

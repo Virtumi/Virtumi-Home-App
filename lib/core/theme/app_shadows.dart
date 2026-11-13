@@ -5,11 +5,12 @@ import 'package:flutter/widgets.dart';
 /// The neumorphic look relies on a dual-shadow triad: a soft dark shadow at the
 /// bottom-right and a light shadow at the top-left. These builders take the
 /// theme-specific [dark] / [light] colors so the same recipe works for both
-/// light and (future) dark themes.
+/// the light and the dark theme.
 class AppShadows {
   AppShadows._();
 
-  /// No shadow — used for flat dark-mode surfaces.
+  /// No shadow — only used by the optional flat elevation mode
+  /// (`AppPalette.flatElevation`), currently unused by both themes.
   static const List<BoxShadow> none = [];
 
   /// Standard "raised" elevation: `8px 8px 16px dark, -8px -8px 16px light`.
@@ -49,7 +50,7 @@ class AppShadows {
         ),
       ];
 
-  /// Flat card elevation for dark mode: tonal layering only, no drop shadow.
+  /// Flat card elevation (optional mode): tonal layering only, no drop shadow.
   static List<BoxShadow> flatCard() => none;
 
   /// Smaller flat elevation for compact buttons in dark mode.

@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/navigation/app_routes.dart';
+import '../../../core/services/preferences_service.dart';
+import '../../../core/supabase/supabase_client.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../shared/application/direct_device_link.dart';
@@ -48,6 +50,35 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
 
   final _power = <String, bool>{};
 
+  @override
+  void initState() {
+    super.initState();
+    final userId = _userId;
+    if (userId == null) return;
+    final prefs = ref.read(preferencesServiceProvider);
+    _roomCards = prefs.favoritesShowsCards(userId);
+    _grouping = switch (prefs.favoritesGrouping(userId)) {
+      'room' => _FavoriteGrouping.room,
+      'type' => _FavoriteGrouping.type,
+      _ => _FavoriteGrouping.none,
+    };
+  }
+
+  String? get _userId =>
+      ref.read(supabaseClientProvider).auth.currentUser?.id;
+
+  void _persistLayout() {
+    final userId = _userId;
+    if (userId == null) return;
+    unawaited(
+      ref.read(preferencesServiceProvider).setFavoritesLayout(
+            userId,
+            showCards: _roomCards,
+            grouping: _grouping.name,
+          ),
+    );
+  }
+
   Future<void> _pickGrouping() async {
     final picked = await showOptionPicker<_FavoriteGrouping>(
       context: context,
@@ -65,6 +96,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
       _grouping = picked;
       _collapsed.clear();
     });
+    _persistLayout();
   }
 
   Future<void> _togglePower(Device device, bool isOn) async {
@@ -147,14 +179,23 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
               children: [
                 NeumorphicIconButton(
                   icon: Symbols.filter_list,
+                  size: 40,
+                  iconSize: 20,
                   tooltip: 'Sortierung',
                   onPressed: _pickGrouping,
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                _ViewSwitch(
-                  roomCards: _roomCards,
-                  accent: accent,
-                  onPressed: () => setState(() => _roomCards = !_roomCards),
+                NeumorphicIconButton(
+                  icon: _roomCards ? Symbols.unfold_less : Symbols.unfold_more,
+                  size: 40,
+                  iconSize: 20,
+                  tooltip: _roomCards
+                      ? 'Zur Statusansicht wechseln'
+                      : 'Zu den Karten wechseln',
+                  onPressed: () {
+                    setState(() => _roomCards = !_roomCards);
+                    _persistLayout();
+                  },
                 ),
               ],
             )
@@ -307,48 +348,6 @@ class _GroupCard extends StatelessWidget {
             ],
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _ViewSwitch extends StatelessWidget {
-  const _ViewSwitch({
-    required this.roomCards,
-    required this.accent,
-    required this.onPressed,
-  });
-
-  final bool roomCards;
-  final Color accent;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = roomCards ? 'Status' : 'Karten';
-    final tooltip = roomCards
-        ? 'Zur Statusansicht mit Online und Offline wechseln'
-        : 'Zu den Karten der Raumübersicht wechseln';
-
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: accent.withValues(alpha: 0.12),
-        borderRadius: AppRadius.full,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: AppRadius.full,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              label,
-              style: context.text.labelMedium?.copyWith(
-                color: accent,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
