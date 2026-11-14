@@ -59,6 +59,7 @@ class Device {
     this.ipAddress = '',
     this.macAddress = '',
     this.hostname = '',
+    this.ownerUserId,
   });
 
   final String id;
@@ -80,6 +81,14 @@ class Device {
   final String ipAddress;
   final String macAddress;
   final String hostname;
+
+  /// Original owner (`devices.user_id`). Differs from the signed-in user when
+  /// the device was shared by someone else. Null when unknown.
+  final String? ownerUserId;
+
+  /// True when [userId] owns this device (or ownership is unknown).
+  bool isOwnedBy(String? userId) =>
+      ownerUserId == null || userId == null || ownerUserId == userId;
 
   String get statusLabel => isOn ? 'An' : 'Aus';
 
@@ -106,6 +115,7 @@ class Device {
       ipAddress: ipAddress,
       macAddress: macAddress,
       hostname: hostname,
+      ownerUserId: ownerUserId,
     );
   }
 }

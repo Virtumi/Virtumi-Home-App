@@ -582,6 +582,105 @@ export type Database = {
           },
         ]
       }
+      device_access_requests: {
+        Row: {
+          created_at: string
+          device_id: string
+          id: string
+          owner_id: string
+          requester_id: string
+          responded_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          id?: string
+          owner_id: string
+          requester_id?: string
+          responded_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          id?: string
+          owner_id?: string
+          requester_id?: string
+          responded_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_access_requests_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_notifications: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          device_name: string
+          id: string
+          read_at: string | null
+          request_id: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          device_name?: string
+          id?: string
+          read_at?: string | null
+          request_id?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          read_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_notifications_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "device_access_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      device_shares: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string
+          scope_id: string
+          scope_type: string
+          shared_with_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          scope_id: string
+          scope_type: string
+          shared_with_user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          scope_id?: string
+          scope_type?: string
+          shared_with_user_id?: string
+        }
+        Relationships: []
+      }
       device_softap_details: {
         Row: {
           created_at: string | null
@@ -1877,6 +1976,7 @@ export type Database = {
     Functions: {
       cleanup_old_livecom_entries: { Args: never; Returns: undefined }
       cleanup_old_update_requests: { Args: never; Returns: undefined }
+      device_owner_id: { Args: { p_device_id: string }; Returns: string }
       get_active_cp_parameters: {
         Args: { target_device_id: string }
         Returns: {
@@ -1919,9 +2019,123 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      find_device_owner: {
+        Args: { p_device_code: string; p_mac: string }
+        Returns: {
+          already_shared: boolean
+          device_id: string
+          device_name: string
+          email: string
+          first_name: string
+          has_pending_request: boolean
+          is_self: boolean
+          last_name: string
+          owner_user_id: string
+        }[]
+      }
+      get_device_access_request: {
+        Args: { p_id: string }
+        Returns: {
+          created_at: string
+          device_id: string
+          device_name: string
+          device_path: string
+          id: string
+          owner_id: string
+          requester_email: string
+          requester_first_name: string
+          requester_id: string
+          requester_last_name: string
+          responded_at: string
+          status: string
+        }[]
+      }
+      is_device_owner: { Args: { p_device_id: string }; Returns: boolean }
+      list_notifications: {
+        Args: never
+        Returns: {
+          actor_email: string
+          actor_first_name: string
+          actor_last_name: string
+          actor_user_id: string
+          created_at: string
+          device_name: string
+          id: string
+          read_at: string
+          request_id: string
+          request_status: string
+          type: string
+        }[]
+      }
+      request_device_access: { Args: { p_device_id: string }; Returns: string }
+      respond_device_access_request: {
+        Args: { p_approve: boolean; p_id: string }
+        Returns: string
+      }
+      list_my_shares: {
+        Args: never
+        Returns: {
+          counterpart_user_id: string
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          scope_id: string
+          scope_name: string
+          scope_path: string
+          scope_type: string
+        }[]
+      }
+      list_shares_with_me: {
+        Args: never
+        Returns: {
+          counterpart_user_id: string
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          scope_id: string
+          scope_name: string
+          scope_path: string
+          scope_type: string
+        }[]
+      }
+      owns_share_scope: {
+        Args: { p_id: string; p_type: string }
+        Returns: boolean
+      }
       reset_cp_parameters: {
         Args: { target_device_id: string }
         Returns: undefined
+      }
+      search_users: {
+        Args: { p_query: string }
+        Returns: {
+          email: string
+          first_name: string
+          last_name: string
+          user_id: string
+        }[]
+      }
+      share_scope_name: {
+        Args: { p_id: string; p_type: string }
+        Returns: string
+      }
+      share_scope_path: {
+        Args: { p_id: string; p_type: string }
+        Returns: string
+      }
+      shared_device_paths: {
+        Args: never
+        Returns: {
+          device_id: string
+          device_type_id: string
+          floor_id: string
+          home_id: string
+          room_id: string
+        }[]
       }
     }
     Enums: {

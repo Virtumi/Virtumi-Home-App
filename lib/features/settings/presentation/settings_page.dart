@@ -29,7 +29,9 @@ class SettingsPage extends ConsumerWidget {
     final userAsync = ref.watch(currentUserProvider);
     final settingsAsync = ref.watch(appSettingsProvider);
     final startLabelAsync = ref.watch(startRouteDisplayLabelProvider);
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(
+      themeModeControllerProvider.select(selectIsDarkMode),
+    );
     final p = context.palette;
 
     Future<void> saveSettings(AppSettings settings) async {
@@ -153,6 +155,12 @@ class SettingsPage extends ConsumerWidget {
                       orElse: () => 'Home',
                     ),
                     onTap: () => context.push(Paths.startScreen),
+                  ),
+                  SettingsRow.navigation(
+                    icon: Symbols.group_add,
+                    title: 'Freigaben',
+                    iconColor: p.accentGreen,
+                    onTap: () => context.push(Paths.sharing),
                   ),
                   SettingsRow.toggle(
                     icon: Symbols.history,

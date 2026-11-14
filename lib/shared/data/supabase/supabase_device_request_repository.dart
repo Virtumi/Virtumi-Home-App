@@ -8,6 +8,8 @@ class SupabaseDeviceRequestRepository implements DeviceRequestRepository {
 
   final SupabaseClient _client;
 
+  /// Written into `user_id`; for shared devices the database trigger replaces
+  /// it with the original owner id (target devices filter on that id).
   String get _userId => requireUserId(_client);
 
   @override
@@ -19,7 +21,6 @@ class SupabaseDeviceRequestRepository implements DeviceRequestRepository {
         .from('cp_btn_requests')
         .select('id')
         .eq('device_id', deviceId)
-        .eq('user_id', userId)
         .order('updated_at', ascending: false);
 
     if (rows.isNotEmpty) {
@@ -79,7 +80,6 @@ class SupabaseDeviceRequestRepository implements DeviceRequestRepository {
         .from(table)
         .select('id')
         .eq('device_id', deviceId)
-        .eq('user_id', userId)
         .order('updated_at', ascending: false);
 
     if (rows.isNotEmpty) {
@@ -127,7 +127,6 @@ class SupabaseDeviceRequestRepository implements DeviceRequestRepository {
           .from(table)
           .select('status, error_message')
           .eq('device_id', deviceId)
-          .eq('user_id', _userId)
           .order('updated_at', ascending: false)
           .limit(1);
 

@@ -12,6 +12,7 @@ import '../../../core/supabase/realtime_guard.dart';
 import '../../../core/supabase/realtime_service.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/widgets/refresh_on_show.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../shared/application/direct_device_link.dart';
 import '../../../shared/application/location_breadcrumb.dart';
@@ -39,7 +40,8 @@ class RoomOverviewPage extends ConsumerStatefulWidget {
   ConsumerState<RoomOverviewPage> createState() => _RoomOverviewPageState();
 }
 
-class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
+class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage>
+    with RefreshOnShow {
   RealtimeService? _realtime;
   final _livecomSubscribed = <String>{};
   Timer? _poll;
@@ -106,6 +108,12 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
             grouping: _grouping.name,
           ),
     );
+  }
+
+  @override
+  void refreshOnShow() {
+    ref.invalidate(roomProvider(widget.roomId));
+    _refresh();
   }
 
   @override
@@ -248,6 +256,7 @@ class _RoomOverviewPageState extends ConsumerState<RoomOverviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    trackVisibility();
     final roomAsync = ref.watch(roomProvider(widget.roomId));
     final devicesAsync = ref.watch(roomDevicesControllerProvider(widget.roomId));
     final room = roomAsync.value;

@@ -1,17 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_providers.dart';
 import '../../core/services/preferences_service.dart';
-import '../../core/supabase/supabase_client.dart';
 import '../data/local_app_settings_repository.dart';
 import '../models/app_settings.dart';
 
 final connectionAppSettingsProvider = FutureProvider<AppSettings?>((ref) async {
-  final authUser = ref.watch(supabaseClientProvider).auth.currentUser;
-  if (authUser == null) return null;
+  // Invalidated by [AppSettingsBootstrap] when the signed-in user changes.
+  final userId = ref.read(authUserIdProvider);
+  if (userId == null) return null;
   final repo = LocalAppSettingsRepository(
     ref.watch(preferencesServiceProvider),
   );
-  return repo.getSettings(authUser.id);
+  return repo.getSettings(userId);
 });
 
 /// Current connection mode: `cloud` or `direct`.

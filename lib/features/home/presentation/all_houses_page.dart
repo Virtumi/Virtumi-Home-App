@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/widgets/refresh_on_show.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../shared/application/recent_house_activity.dart';
 import '../../../shared/models/models.dart';
@@ -20,8 +21,12 @@ class AllHousesPage extends ConsumerStatefulWidget {
   ConsumerState<AllHousesPage> createState() => _AllHousesPageState();
 }
 
-class _AllHousesPageState extends ConsumerState<AllHousesPage> {
+class _AllHousesPageState extends ConsumerState<AllHousesPage>
+    with RefreshOnShow {
   bool _editing = false;
+
+  @override
+  void refreshOnShow() => _refresh();
 
   void _refresh() {
     ref.invalidate(housesProvider);
@@ -60,7 +65,12 @@ class _AllHousesPageState extends ConsumerState<AllHousesPage> {
 
   @override
   Widget build(BuildContext context) {
+    trackVisibility();
     final housesAsync = ref.watch(housesProvider);
+    // Shared (non-owned) houses cannot be re-iconed.
+    final ownedIds = ref.watch(ownedLocationIdsProvider).value;
+    bool owns(String id) =>
+        id.startsWith('syn:') || (ownedIds?.contains(id) ?? false);
 
     return AppScaffold(
       header: AppHeader(
@@ -95,8 +105,8 @@ class _AllHousesPageState extends ConsumerState<AllHousesPage> {
                       subtitle:
                           '${house.deviceCount} Geräte \u00b7 ${house.roomCount} Räume',
                       accent: context.colors.primary,
-                      showIconEditHint: _editing,
-                      onTap: _editing
+                      showIconEditHint: _editing && owns(house.id),
+                      onTap: _editing && owns(house.id)
                           ? () => _pickHouseIcon(house)
                           : () => _openHouse(house),
                     ),

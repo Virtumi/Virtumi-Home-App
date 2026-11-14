@@ -16,6 +16,8 @@ class AppRoute {
   // Settings sub
   static const String profile = 'profile';
   static const String startScreen = 'startScreen';
+  static const String sharing = 'sharing';
+  static const String addShare = 'addShare';
 
   // Home drill-down
   static const String allHouses = 'allHouses';
@@ -24,6 +26,8 @@ class AppRoute {
   static const String roomOverview = 'roomOverview';
   static const String deviceDetails = 'deviceDetails';
   static const String newDeviceWizard = 'newDeviceWizard';
+  static const String notifications = 'notifications';
+  static const String accessRequest = 'accessRequest';
   static const String deviceSettings = 'deviceSettings';
 
   // Device settings sub-pages
@@ -58,6 +62,8 @@ class Paths {
   static const String settings = '/settings';
   static const String profile = '/settings/profile';
   static const String startScreen = '/settings/start-screen';
+  static const String sharing = '/settings/sharing';
+  static const String addShare = '/settings/sharing/add';
 
   static const String allHouses = '/home/houses';
   static String floors(String houseId) => '/home/house/$houseId';
@@ -65,6 +71,9 @@ class Paths {
   static String roomOverview(String roomId) => '/home/room/$roomId';
   static String deviceDetails(String deviceId) => '/home/device/$deviceId';
   static const String newDeviceWizard = '/home/add-device';
+  static const String notifications = '/home/notifications';
+  static String accessRequest(String requestId) =>
+      '/home/notifications/request/$requestId';
   static String deviceSettings(String deviceId) =>
       '/home/device/$deviceId/settings';
 

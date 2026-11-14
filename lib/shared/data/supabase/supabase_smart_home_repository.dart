@@ -34,14 +34,15 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
 
   @override
   Future<List<House>> getHouses() async {
-    final userId = requireUserId(_client);
+    // No user_id filter: RLS returns own homes plus homes containing devices
+    // that other users shared with the current user.
+    requireUserId(_client);
 
     final rows = await _client
         .from('homes')
         .select(
           'id, name, description, floors(rooms(device_types(devices(id))))',
         )
-        .eq('user_id', userId)
         .order('name');
 
     if (rows.isNotEmpty) {
@@ -54,29 +55,43 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
       ];
     }
 
-    await _buildSyntheticTree(userId);
+    await _buildSyntheticTree();
     _useSynthetic = true;
     return _syntheticTree!.houses;
   }
 
-  Future<void> _buildSyntheticTree(String userId) async {
+  Future<void> _buildSyntheticTree() async {
     final deviceRows = await _client
         .from('devices')
-        .select('*, device_types(name, room_id), device_location_settings(*)')
-        .eq('user_id', userId);
+        .select('*, device_types(name, room_id)');
+
+    // `device_location_settings.device_id` has no foreign key to `devices`,
+    // so PostgREST cannot embed it (HTTP 400). Load it by device id instead.
+    final locationByDevice = <String, Map<String, dynamic>>{};
+    if (deviceRows.isNotEmpty) {
+      final locationRows = await _client
+          .from('device_location_settings')
+          .select()
+          .inFilter('device_id', [
+            for (final row in deviceRows) row['id'] as String,
+          ]);
+      for (final raw in locationRows) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final id = row['device_id'] as String?;
+        if (id != null) locationByDevice.putIfAbsent(id, () => row);
+      }
+    }
 
     final houses = <String, House>{};
     final floorsByHouse = <String, Map<String, Floor>>{};
     final roomsByFloor = <String, Map<String, Room>>{};
     final devicesByRoom = <String, List<Device>>{};
-    final livecom = await _latestLivecomByDevice(userId);
+    final livecom = await _latestLivecomByDevice([
+      for (final row in deviceRows) row['id'] as String,
+    ]);
 
     for (final row in deviceRows) {
-      final locationList = row['device_location_settings'];
-      Map<String, dynamic>? location;
-      if (locationList is List && locationList.isNotEmpty) {
-        location = Map<String, dynamic>.from(locationList.first as Map);
-      }
+      final location = locationByDevice[row['id'] as String];
 
       final homeName =
           location?['home'] as String? ?? 'Meine Geräte';
@@ -169,12 +184,21 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
     );
   }
 
-  /// Newest `livecom.updated_at` per device UUID for the signed-in user.
-  Future<Map<String, DateTime>> _latestLivecomByDevice(String userId) async {
+  /// Newest `livecom.updated_at` per device UUID for the given devices.
+  ///
+  /// Filters by device id (not user id) so devices shared by other users work
+  /// too. The `livecom` table is readable by every authenticated user, so an
+  /// unfiltered query must never be issued.
+  Future<Map<String, DateTime>> _latestLivecomByDevice(
+    Iterable<String> deviceIds,
+  ) async {
+    final ids = deviceIds.toSet().toList();
+    if (ids.isEmpty) return {};
+
     final rows = await _client
         .from('livecom')
         .select('device_id, updated_at')
-        .eq('user_id', userId);
+        .inFilter('device_id', ids);
 
     final latest = <String, DateTime>{};
     for (final raw in rows as List) {
@@ -197,8 +221,7 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
   }
 
   Future<DeviceConnectivity> _connectivityForDevice(String deviceId) async {
-    final userId = requireUserId(_client);
-    final livecom = await _latestLivecomByDevice(userId);
+    final livecom = await _latestLivecomByDevice([deviceId]);
     return _connectivityFrom(livecom[deviceId]);
   }
 
@@ -402,7 +425,9 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
     if (_useSynthetic || isSyntheticId(roomId)) {
       await getHouses();
       final cached = _syntheticTree?.devicesByRoom[roomId] ?? [];
-      final livecom = await _latestLivecomByDevice(requireUserId(_client));
+      final livecom = await _latestLivecomByDevice(
+        [for (final device in cached) device.id],
+      );
       return [
         for (final device in cached)
           device.copyWith(connectivity: _connectivityFrom(livecom[device.id])),
@@ -414,7 +439,9 @@ class SupabaseSmartHomeRepository implements SmartHomeRepository {
         .select('*, device_types!inner(name, room_id)')
         .eq('device_types.room_id', roomId);
 
-    final livecom = await _latestLivecomByDevice(requireUserId(_client));
+    final livecom = await _latestLivecomByDevice(
+      [for (final raw in rows) raw['id'] as String],
+    );
     return [
       for (final raw in rows)
         mapDeviceRow(

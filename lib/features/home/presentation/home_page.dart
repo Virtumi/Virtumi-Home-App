@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/widgets/refresh_on_show.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../shared/application/favorite_devices.dart';
 import '../../../shared/application/recent_house_activity.dart';
@@ -21,21 +22,20 @@ class HomePage extends ConsumerStatefulWidget {
   ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage> {
+class _HomePageState extends ConsumerState<HomePage> with RefreshOnShow {
   static const User _placeholderUser =
       User(id: '', name: '', email: '', badges: []);
 
-  bool _wasHidden = false;
+  // Providers are created fresh when the Home tab is first built.
+  @override
+  bool get refreshOnInit => false;
+
+  @override
+  void refreshOnShow() => refreshHomeScreenData(ref);
 
   @override
   Widget build(BuildContext context) {
-    final isVisible = ModalRoute.of(context)?.isCurrent ?? true;
-    if (isVisible && _wasHidden) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) refreshHomeScreenData(ref);
-      });
-    }
-    _wasHidden = !isVisible;
+    trackVisibility();
 
     final userAsync = ref.watch(currentUserProvider);
     final settingsAsync = ref.watch(appSettingsProvider);
@@ -53,28 +53,125 @@ class _HomePageState extends ConsumerState<HomePage> {
       orElse: () => true,
     );
 
+    final hasNoHouses = ref.watch(housesProvider).maybeWhen(
+          data: (houses) => houses.isEmpty,
+          orElse: () => false,
+        );
+
+    // Selected directly (no derived provider) so bursts of realtime events
+    // cannot rebuild a derived provider twice in one frame.
+    final unreadNotifications = ref.watch(
+      notificationsProvider.select(unreadNotificationCount),
+    );
+
     return AppScaffold(
       header: HomeTopBar(
         user: user,
         connection: connection,
-        onNotifications: () {},
+        unreadCount: unreadNotifications,
+        onNotifications: () => context.push(Paths.notifications),
       ),
-      body: AppScrollView(
-        children: [
-          ActionBannerCard(
-            icon: Symbols.add_circle,
-            title: 'Neues Gerät hinzufügen',
-            subtitle: 'Assistent: Passwort, Netzwerk oder Bluetooth',
-            accent: context.colors.primary,
-            trailingIcon: Symbols.add,
-            trailingFilledButton: true,
-            onTap: () => context.push(Paths.newDeviceWizard),
+      body: hasNoHouses
+          ? _NoDevicesState(
+              onAddDevice: () => context.push(Paths.newDeviceWizard),
+            )
+          : AppScrollView(
+              children: [
+                ActionBannerCard(
+                  icon: Symbols.add_circle,
+                  title: 'Neues Gerät hinzufügen',
+                  subtitle: 'Assistent: Passwort, Netzwerk oder Bluetooth',
+                  accent: context.colors.primary,
+                  trailingIcon: Symbols.add,
+                  trailingFilledButton: true,
+                  onTap: () => context.push(Paths.newDeviceWizard),
+                ),
+                const _HousesSection(),
+                if (showFavorites) const _FavoritesSection(),
+                if (showRecentActivity) const _RecentActivitySection(),
+              ],
+            ),
+    );
+  }
+}
+
+/// Shown instead of the Home lists while the account has no devices (and
+/// therefore no houses): one large, centered call-to-action.
+class _NoDevicesState extends StatelessWidget {
+  const _NoDevicesState({required this.onAddDevice});
+
+  final VoidCallback onAddDevice;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomClearance = AppSpacing.scrollBottomClearance(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.containerPadding,
+            AppSpacing.gutter,
+            AppSpacing.containerPadding,
+            bottomClearance,
           ),
-          const _HousesSection(),
-          if (showFavorites) const _FavoritesSection(),
-          if (showRecentActivity) const _RecentActivitySection(),
-        ],
-      ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight -
+                  AppSpacing.gutter -
+                  bottomClearance,
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 112,
+                    height: 112,
+                    decoration: BoxDecoration(
+                      color: context.colors.primary.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Symbols.add_home,
+                      size: 56,
+                      color: context.colors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    'Noch keine Geräte',
+                    style: context.text.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Füge dein erstes Gerät hinzu, um loszulegen.',
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 64,
+                    child: FilledButton.icon(
+                      onPressed: onAddDevice,
+                      icon: const Icon(Symbols.add, size: 28),
+                      label: const Text('Gerät hinzufügen'),
+                      style: FilledButton.styleFrom(
+                        textStyle: context.text.titleMedium,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

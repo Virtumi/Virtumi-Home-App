@@ -28,11 +28,13 @@ Future<void> main() async {
   );
 
   final prefs = await SharedPreferences.getInstance();
+  final preferencesService = PreferencesService(prefs);
+  await preferencesService.clearLegacyRecentLists();
 
   runApp(
     ProviderScope(
       overrides: [
-        preferencesServiceProvider.overrideWithValue(PreferencesService(prefs)),
+        preferencesServiceProvider.overrideWithValue(preferencesService),
       ],
       child: AppSettingsBootstrap(
         child: const VirtumiHomeApp(),

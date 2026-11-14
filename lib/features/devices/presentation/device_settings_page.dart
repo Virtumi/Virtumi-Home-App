@@ -181,19 +181,23 @@ class DeviceSettingsPage extends ConsumerWidget {
         accent: p.accentBlue,
         onTap: () => context.push(Paths.generalSettings(deviceId)),
       ),
-      SettingsGridTile(
-        icon: Symbols.lock,
-        label: 'Passwort\nändern',
-        accent: p.accentBlue,
-        onTap: () => context.push(Paths.changePassword(deviceId)),
-      ),
-      SettingsGridTile(
-        icon: Symbols.delete,
-        label: 'Löschen',
-        accent: p.accentRed,
-        danger: true,
-        onTap: () => _confirmDelete(context, ref),
-      ),
+      // The device password is owner-only (`device_secret`).
+      if (ref.watch(isDeviceOwnerProvider(deviceId)))
+        SettingsGridTile(
+          icon: Symbols.lock,
+          label: 'Passwort\nändern',
+          accent: p.accentBlue,
+          onTap: () => context.push(Paths.changePassword(deviceId)),
+        ),
+      // Only the original owner may delete; shared users never see this tile.
+      if (ref.watch(isDeviceOwnerProvider(deviceId)))
+        SettingsGridTile(
+          icon: Symbols.delete,
+          label: 'Löschen',
+          accent: p.accentRed,
+          danger: true,
+          onTap: () => _confirmDelete(context, ref),
+        ),
     ];
 
     final showHeaderActions = device != null &&

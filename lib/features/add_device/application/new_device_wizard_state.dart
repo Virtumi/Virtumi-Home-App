@@ -31,6 +31,9 @@ class NewDeviceWizardState {
     this.error,
     this.usedLanPath = true,
     this.locationPreviousStep = WizardStep.lanScan,
+    this.ownerInfo,
+    this.claimPreviousStep = WizardStep.lanScan,
+    this.accessRequestSent = false,
   });
 
   final WizardStep step;
@@ -55,6 +58,16 @@ class NewDeviceWizardState {
   final String? error;
   final bool usedLanPath;
   final WizardStep locationPreviousStep;
+
+  /// Account the selected device already belongs to (set on the
+  /// [WizardStep.deviceClaimed] step).
+  final DeviceOwnerInfo? ownerInfo;
+
+  /// Step the back button of [WizardStep.deviceClaimed] returns to.
+  final WizardStep claimPreviousStep;
+
+  /// True once an access request for [ownerInfo] was sent in this session.
+  final bool accessRequestSent;
 
   String get targetIp => selectedDevice?.ipAddress ?? '';
 
@@ -83,6 +96,10 @@ class NewDeviceWizardState {
     bool? usedLanPath,
     WizardStep? locationPreviousStep,
     bool clearBleConnection = false,
+    DeviceOwnerInfo? ownerInfo,
+    bool clearOwnerInfo = false,
+    WizardStep? claimPreviousStep,
+    bool? accessRequestSent,
   }) {
     return NewDeviceWizardState(
       step: step ?? this.step,
@@ -102,14 +119,17 @@ class NewDeviceWizardState {
       confirmDevicePassword:
           confirmDevicePassword ?? this.confirmDevicePassword,
       savedDeviceId: savedDeviceId ?? this.savedDeviceId,
-      bleConnection:
-          clearBleConnection ? null : (bleConnection ?? this.bleConnection),
+      bleConnection: clearBleConnection
+          ? null
+          : (bleConnection ?? this.bleConnection),
       scanResults: scanResults ?? this.scanResults,
       isBusy: isBusy ?? this.isBusy,
       error: clearError ? null : (error ?? this.error),
       usedLanPath: usedLanPath ?? this.usedLanPath,
-      locationPreviousStep:
-          locationPreviousStep ?? this.locationPreviousStep,
+      locationPreviousStep: locationPreviousStep ?? this.locationPreviousStep,
+      ownerInfo: clearOwnerInfo ? null : (ownerInfo ?? this.ownerInfo),
+      claimPreviousStep: claimPreviousStep ?? this.claimPreviousStep,
+      accessRequestSent: accessRequestSent ?? this.accessRequestSent,
     );
   }
 }

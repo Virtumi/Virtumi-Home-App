@@ -21,10 +21,12 @@ import '../data/mock_user_repository.dart';
 import '../data/supabase/supabase_cp_settings_repository.dart';
 import '../data/supabase/supabase_device_config_repository.dart';
 import '../data/supabase/supabase_device_data_repository.dart';
+import '../data/supabase/supabase_device_access_repository.dart';
 import '../data/supabase/supabase_device_request_repository.dart';
 import '../data/supabase/supabase_ems_history_repository.dart';
 import '../data/supabase/supabase_ems_sensor_repository.dart';
 import '../data/supabase/supabase_smart_home_repository.dart';
+import '../data/supabase/supabase_sharing_repository.dart';
 import '../data/supabase/supabase_smart_led_repository.dart';
 import '../data/supabase/supabase_user_repository.dart';
 import '../data/connection_aware/connection_aware_repositories.dart';
@@ -41,10 +43,12 @@ import '../domain/cp_settings_repository.dart';
 import '../domain/device_config_repository.dart';
 import '../domain/device_data_repository.dart';
 import '../domain/device_discovery_repository.dart';
+import '../domain/device_access_repository.dart';
 import '../domain/device_request_repository.dart';
 import '../domain/ems_sensor_repository.dart';
 import '../domain/location_repository.dart';
 import '../domain/smart_home_repository.dart';
+import '../domain/sharing_repository.dart';
 import '../domain/smart_led_repository.dart';
 import '../domain/user_repository.dart';
 
@@ -76,6 +80,16 @@ final smartHomeRepositoryProvider = Provider<SmartHomeRepository>((ref) {
 /// Current user repository.
 final userRepositoryProvider = Provider<UserRepository>((ref) {
   return SupabaseUserRepository(ref.watch(supabaseClientProvider));
+});
+
+/// Sharing of houses/floors/rooms/devices with other users.
+final sharingRepositoryProvider = Provider<SharingRepository>((ref) {
+  return SupabaseSharingRepository(ref.watch(supabaseClientProvider));
+});
+
+/// Access requests for devices of other accounts + notification inbox.
+final deviceAccessRepositoryProvider = Provider<DeviceAccessRepository>((ref) {
+  return SupabaseDeviceAccessRepository(ref.watch(supabaseClientProvider));
 });
 
 /// App settings repository (Einstellungen).

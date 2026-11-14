@@ -37,10 +37,17 @@ bool resolveIsDarkMode(ThemeMode mode, Brightness platformBrightness) {
   };
 }
 
-/// Convenience selector: is the dark theme currently active?
-final isDarkModeProvider = Provider<bool>((ref) {
-  final mode = ref.watch(themeModeControllerProvider);
-  final brightness =
-      WidgetsBinding.instance.platformDispatcher.platformBrightness;
-  return resolveIsDarkMode(mode, brightness);
-});
+/// Selector for widgets: is the dark theme currently active?
+///
+/// Deliberately NOT a derived `Provider<bool>`: the theme mode can change more
+/// than once per frame (settings toggle + settings sync), and Riverpod rejects
+/// a derived provider that rebuilds twice in one frame, which left it in an
+/// error state ("uninitialized provider"). Selecting directly avoids that.
+///
+/// Usage: `ref.watch(themeModeControllerProvider.select(selectIsDarkMode))`.
+bool selectIsDarkMode(ThemeMode mode) {
+  return resolveIsDarkMode(
+    mode,
+    WidgetsBinding.instance.platformDispatcher.platformBrightness,
+  );
+}

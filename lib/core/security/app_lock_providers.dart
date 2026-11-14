@@ -16,6 +16,15 @@ class AppLockState {
   final bool isLocked;
   final bool skipLockUntilBackground;
 
+  @override
+  bool operator ==(Object other) =>
+      other is AppLockState &&
+      other.isLocked == isLocked &&
+      other.skipLockUntilBackground == skipLockUntilBackground;
+
+  @override
+  int get hashCode => Object.hash(isLocked, skipLockUntilBackground);
+
   AppLockState copyWith({
     bool? isLocked,
     bool? skipLockUntilBackground,
@@ -77,10 +86,6 @@ class AppLockNotifier extends Notifier<AppLockState> {
 
 final appLockProvider =
     NotifierProvider<AppLockNotifier, AppLockState>(AppLockNotifier.new);
-
-final isAppLockedProvider = Provider<bool>((ref) {
-  return ref.watch(appLockProvider).isLocked;
-});
 
 final hasLocalPinProvider = FutureProvider.family<bool, String>((ref, userId) {
   return ref.watch(appLockServiceProvider).hasPin(userId);

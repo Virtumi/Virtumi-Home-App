@@ -33,6 +33,11 @@ import '../../features/rooms/presentation/room_overview_page.dart';
 import '../../features/rooms/presentation/rooms_page.dart';
 import '../../features/scenes/presentation/scenes_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
+import '../../features/notifications/presentation/device_access_request_page.dart';
+import '../../features/notifications/presentation/notifications_page.dart';
+import '../../features/sharing/presentation/add_share_page.dart';
+import '../../features/sharing/presentation/sharing_page.dart';
+import '../../shared/models/device_share.dart';
 import '../../features/settings/presentation/start_screen_picker_page.dart';
 import '../supabase/supabase_client.dart';
 import 'app_routes.dart';
@@ -113,6 +118,26 @@ final routerProvider = Provider<GoRouter>((ref) {
                       state,
                       const NewDeviceWizardPage(),
                     ),
+                  ),
+                  GoRoute(
+                    path: 'notifications',
+                    name: AppRoute.notifications,
+                    pageBuilder: (context, state) => slidePage(
+                      state,
+                      const NotificationsPage(),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'request/:requestId',
+                        name: AppRoute.accessRequest,
+                        pageBuilder: (context, state) => slidePage(
+                          state,
+                          DeviceAccessRequestPage(
+                            requestId: state.pathParameters['requestId']!,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   GoRoute(
                     path: 'houses',
@@ -197,6 +222,26 @@ final routerProvider = Provider<GoRouter>((ref) {
                     state,
                     const StartScreenPickerPage(),
                   ),
+                ),
+                GoRoute(
+                  path: 'sharing',
+                  name: AppRoute.sharing,
+                  pageBuilder: (context, state) =>
+                      slidePage(state, const SharingPage()),
+                  routes: [
+                    GoRoute(
+                      path: 'add',
+                      name: AppRoute.addShare,
+                      pageBuilder: (context, state) => slidePage(
+                        state,
+                        AddSharePage(
+                          initialUser: state.extra is UserSearchResult
+                              ? state.extra as UserSearchResult
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

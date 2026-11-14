@@ -16,8 +16,10 @@ class PreferencesService {
   final SharedPreferences _prefs;
 
   static const String _themeModeKey = 'theme_mode';
-  static const String _recentDeviceIdsKey = 'recent_device_ids';
-  static const String _recentHouseIdsKey = 'recent_house_ids';
+  static const String _legacyRecentDeviceIdsKey = 'recent_device_ids';
+  static const String _legacyRecentHouseIdsKey = 'recent_house_ids';
+  static const String _recentDeviceIdsPrefix = 'recent_device_ids_';
+  static const String _recentHouseIdsPrefix = 'recent_house_ids_';
   static const String _favoriteDeviceIdsPrefix = 'favorite_device_ids_';
   static const String _favoritesViewPrefix = 'favorites_view_';
   static const String _favoritesGroupingPrefix = 'favorites_grouping_';
@@ -45,11 +47,11 @@ class PreferencesService {
     return _prefs.setString(_themeModeKey, mode.name);
   }
 
-  List<String> get recentDeviceIds =>
-      _prefs.getStringList(_recentDeviceIdsKey) ?? const [];
+  List<String> recentDeviceIds(String userId) =>
+      _prefs.getStringList('$_recentDeviceIdsPrefix$userId') ?? const [];
 
-  Future<void> setRecentDeviceIds(List<String> ids) {
-    return _prefs.setStringList(_recentDeviceIdsKey, ids);
+  Future<void> setRecentDeviceIds(String userId, List<String> ids) {
+    return _prefs.setStringList('$_recentDeviceIdsPrefix$userId', ids);
   }
 
   List<String> favoriteDeviceIds(String userId) =>
@@ -105,11 +107,18 @@ class PreferencesService {
     await _prefs.setString('$_roomGroupingPrefix${userId}_$roomId', grouping);
   }
 
-  List<String> get recentHouseIds =>
-      _prefs.getStringList(_recentHouseIdsKey) ?? const [];
+  List<String> recentHouseIds(String userId) =>
+      _prefs.getStringList('$_recentHouseIdsPrefix$userId') ?? const [];
 
-  Future<void> setRecentHouseIds(List<String> ids) {
-    return _prefs.setStringList(_recentHouseIdsKey, ids);
+  Future<void> setRecentHouseIds(String userId, List<String> ids) {
+    return _prefs.setStringList('$_recentHouseIdsPrefix$userId', ids);
+  }
+
+  /// Removes the former global (not user-bound) recent lists so they are never
+  /// attributed to another account.
+  Future<void> clearLegacyRecentLists() async {
+    await _prefs.remove(_legacyRecentDeviceIdsKey);
+    await _prefs.remove(_legacyRecentHouseIdsKey);
   }
 
   String? startRouteForUser(String userId) {
@@ -126,7 +135,7 @@ class PreferencesService {
     final legacyStart = startRouteForUser(userId);
     return AppSettings(
       userId: userId,
-      darkMode: themeMode == ThemeMode.dark,
+      darkMode: stored?['darkMode'] as bool? ?? themeMode == ThemeMode.dark,
       language: stored?['language'] as String? ?? 'de',
       biometricEnabled: stored?['biometricEnabled'] as bool? ?? false,
       pinEnabled: stored?['pinEnabled'] as bool? ?? false,
@@ -146,8 +155,14 @@ class PreferencesService {
     return _readAppSettingsMap(userId)?.containsKey('pinEnabled') ?? false;
   }
 
+  /// True once the Dark-Mode choice was stored for [userId].
+  bool hasStoredDarkMode(String userId) {
+    return _readAppSettingsMap(userId)?.containsKey('darkMode') ?? false;
+  }
+
   Future<void> saveAppSettings(AppSettings settings) async {
     final payload = <String, Object>{
+      'darkMode': settings.darkMode,
       'language': settings.language,
       'biometricEnabled': settings.biometricEnabled,
       'pinEnabled': settings.pinEnabled,

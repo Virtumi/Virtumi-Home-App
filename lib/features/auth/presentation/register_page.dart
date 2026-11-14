@@ -17,23 +17,43 @@ class RegisterPage extends ConsumerStatefulWidget {
 }
 
 class _RegisterPageState extends ConsumerState<RegisterPage> {
+  final _firstName = TextEditingController();
+  final _lastName = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+  final _phone = TextEditingController();
+  final _street = TextEditingController();
+  final _postalCode = TextEditingController();
+  final _city = TextEditingController();
+  final _country = TextEditingController(text: 'Deutschland');
   bool _obscure = true;
   bool _loading = false;
 
   @override
   void dispose() {
+    _firstName.dispose();
+    _lastName.dispose();
     _email.dispose();
     _password.dispose();
     _confirm.dispose();
+    _phone.dispose();
+    _street.dispose();
+    _postalCode.dispose();
+    _city.dispose();
+    _country.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (_loading) return;
 
+    if (_firstName.text.trim().isEmpty || _lastName.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte Vorname und Nachname eingeben')),
+      );
+      return;
+    }
     if (_password.text.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Passwort muss mindestens 8 Zeichen haben')),
@@ -52,6 +72,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       await ref.read(authRepositoryProvider).signUp(
             email: _email.text.trim(),
             password: _password.text,
+            firstName: _firstName.text.trim(),
+            lastName: _lastName.text.trim(),
+            phone: _phone.text.trim(),
+            addressStreet: _street.text.trim(),
+            addressPostalCode: _postalCode.text.trim(),
+            addressCity: _city.text.trim(),
+            addressCountry: _country.text.trim(),
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -95,6 +122,22 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             child: Column(
               children: [
                 SettingsInputRow(
+                  icon: Symbols.person,
+                  label: 'Vorname *',
+                  controller: _firstName,
+                  iconColor: context.palette.accentBlue,
+                  keyboardType: TextInputType.name,
+                ),
+                const Divider(height: 1),
+                SettingsInputRow(
+                  icon: Symbols.badge,
+                  label: 'Nachname *',
+                  controller: _lastName,
+                  iconColor: context.palette.accentIndigo,
+                  keyboardType: TextInputType.name,
+                ),
+                const Divider(height: 1),
+                SettingsInputRow(
                   icon: Symbols.mail,
                   label: 'E-Mail',
                   controller: _email,
@@ -117,6 +160,50 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   controller: _confirm,
                   iconColor: context.palette.accentGreen,
                   obscure: _obscure,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.gutter),
+          const AppSectionLabel('Weitere Angaben (optional)'),
+          AppCard(
+            child: Column(
+              children: [
+                SettingsInputRow(
+                  icon: Symbols.phone,
+                  label: 'Telefon',
+                  controller: _phone,
+                  iconColor: context.palette.accentTeal,
+                  keyboardType: TextInputType.phone,
+                ),
+                const Divider(height: 1),
+                SettingsInputRow(
+                  icon: Symbols.home,
+                  label: 'Straße',
+                  controller: _street,
+                  iconColor: context.palette.accentOrange,
+                ),
+                const Divider(height: 1),
+                SettingsInputRow(
+                  icon: Symbols.markunread_mailbox,
+                  label: 'PLZ',
+                  controller: _postalCode,
+                  iconColor: context.palette.accentAmber,
+                  keyboardType: TextInputType.number,
+                ),
+                const Divider(height: 1),
+                SettingsInputRow(
+                  icon: Symbols.location_city,
+                  label: 'Stadt',
+                  controller: _city,
+                  iconColor: context.palette.accentSky,
+                ),
+                const Divider(height: 1),
+                SettingsInputRow(
+                  icon: Symbols.public,
+                  label: 'Land',
+                  controller: _country,
+                  iconColor: context.palette.accentPurple,
                 ),
               ],
             ),

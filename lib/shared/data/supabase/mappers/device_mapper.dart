@@ -45,6 +45,7 @@ Device mapDeviceRow(
     ipAddress: row['ip_address'] as String? ?? '',
     macAddress: row['mac_address'] as String? ?? '',
     hostname: row['hostname'] as String? ?? '',
+    ownerUserId: row['user_id'] as String?,
   );
 }
 

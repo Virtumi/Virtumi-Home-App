@@ -9,7 +9,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/data/supabase/mappers/config_mappers.dart';
 import '../../../shared/models/models.dart';
+import '../../../shared/providers/connection_mode_provider.dart';
 import '../../../shared/providers/data_providers.dart';
+import '../../../shared/providers/repository_providers.dart';
 import '../models/wizard_found_device.dart';
 import '../models/wizard_step.dart';
 import '../repositories/device_setup_repository.dart';
@@ -48,6 +50,75 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
   NetworkInfoService get _network => ref.read(networkInfoServiceProvider);
   DeviceSetupRepository get _setup => ref.read(deviceSetupRepositoryProvider);
   SupabaseClient get _client => ref.read(supabaseClientProvider);
+
+  /// MAC of the device the account-ownership check already ran for.
+  String? _ownerCheckedMac;
+
+  /// Looks up whether [device] already belongs to an account (own or other).
+  ///
+  /// Returns null when it is free, when the check is not applicable (direct
+  /// mode, signed out, no MAC yet) or when the lookup fails: a failing check
+  /// must never block the wizard.
+  Future<DeviceOwnerInfo?> _findOwnerConflict(WizardFoundDevice device) async {
+    final mac = device.macAddress.trim();
+    if (mac.isEmpty) return null;
+    if (_client.auth.currentUser == null) return null;
+    if (ref.read(isDirectConnectionProvider)) return null;
+
+    try {
+      return await ref
+          .read(deviceAccessRepositoryProvider)
+          .findDeviceOwner(
+            macAddress: mac,
+            deviceCode: state.devicePassword.trim(),
+          );
+    } catch (_) {
+      return null;
+    } finally {
+      _ownerCheckedMac = mac;
+    }
+  }
+
+  void _enterClaimedStep(
+    WizardFoundDevice device,
+    DeviceOwnerInfo info,
+    WizardStep previous,
+  ) {
+    state = state.copyWith(
+      selectedDevice: device,
+      ownerInfo: info,
+      claimPreviousStep: previous,
+      accessRequestSent: false,
+      step: WizardStep.deviceClaimed,
+      clearBleConnection: true,
+      isBusy: false,
+      clearError: true,
+    );
+  }
+
+  /// Option 1 on the claimed-device step: ask the owner for access.
+  Future<void> requestDeviceAccess() async {
+    final info = state.ownerInfo;
+    if (info == null || info.isSelf || info.alreadyShared) return;
+
+    state = state.copyWith(isBusy: true, clearError: true);
+    try {
+      await ref
+          .read(deviceAccessRepositoryProvider)
+          .requestAccess(info.deviceId);
+      state = state.copyWith(accessRequestSent: true, isBusy: false);
+    } on DeviceAccessException catch (e) {
+      state = state.copyWith(
+        isBusy: false,
+        accessRequestSent: e.error == DeviceAccessError.requestPending
+            ? true
+            : null,
+        error: e.error == DeviceAccessError.requestPending ? null : e.message,
+      );
+    } catch (e) {
+      state = state.copyWith(isBusy: false, error: e.toString());
+    }
+  }
 
   DeviceLocation _withStoredEmsName(
     WizardFoundDevice device,
@@ -202,9 +273,18 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
     state = state.copyWith(flashingDeviceKeys: keys);
   }
 
-  void selectLanDevice(WizardFoundDevice device) {
+  Future<void> selectLanDevice(WizardFoundDevice device) async {
     unawaited(_stopFlashingDevices([device]));
+
+    state = state.copyWith(isBusy: true, clearError: true);
+    final conflict = await _findOwnerConflict(device);
+    if (conflict != null) {
+      _enterClaimedStep(device, conflict, WizardStep.lanScan);
+      return;
+    }
+
     state = state.copyWith(
+      isBusy: false,
       selectedDevice: device,
       targetPort: device.port,
       deviceLocation: _defaultLocation(device),
@@ -304,6 +384,13 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
           state.devicePassword.trim(),
         );
         await connection.disconnect();
+
+        final conflict = await _findOwnerConflict(device);
+        if (conflict != null) {
+          _enterClaimedStep(device, conflict, WizardStep.btPick);
+          return;
+        }
+
         state = state.copyWith(
           selectedDevice: device,
           deviceLocation: _defaultLocation(device),
@@ -348,6 +435,12 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
         throw StateError('Keine IP in BLE-Antwort');
       }
 
+      final conflict = await _findOwnerConflict(device);
+      if (conflict != null) {
+        _enterClaimedStep(device, conflict, WizardStep.btPick);
+        return;
+      }
+
       state = state.copyWith(
         selectedDevice: device,
         targetPort: device.port,
@@ -376,6 +469,12 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
         'port': port,
       });
       await state.bleConnection?.disconnect();
+
+      final conflict = await _findOwnerConflict(device);
+      if (conflict != null) {
+        _enterClaimedStep(device, conflict, WizardStep.btPick);
+        return;
+      }
 
       state = state.copyWith(
         selectedDevice: device,
@@ -408,6 +507,16 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
           ...info,
           'ip_address': selected.ipAddress,
         }).withIdentityFrom(selected);
+      }
+
+      // Paths that learn the MAC only now (e.g. Bluetooth) check ownership
+      // here, before anything is written to the device.
+      if (selected.macAddress.trim() != _ownerCheckedMac) {
+        final conflict = await _findOwnerConflict(selected);
+        if (conflict != null) {
+          _enterClaimedStep(selected, conflict, state.locationPreviousStep);
+          return;
+        }
       }
 
       final json = await _udp.readLocation(
@@ -713,6 +822,13 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
         state = state.copyWith(step: WizardStep.btWifi, clearError: true);
       case WizardStep.btResolve:
         state = state.copyWith(step: WizardStep.btWait, clearError: true);
+      case WizardStep.deviceClaimed:
+        state = state.copyWith(
+          step: state.claimPreviousStep,
+          clearOwnerInfo: true,
+          accessRequestSent: false,
+          clearError: true,
+        );
       case WizardStep.location:
         state = state.copyWith(
           step: state.locationPreviousStep,

@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/extensions/accent_resolver.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/widgets/refresh_on_show.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../shared/application/location_breadcrumb.dart';
 import '../../../shared/models/models.dart';
@@ -23,8 +24,14 @@ class FloorsPage extends ConsumerStatefulWidget {
   ConsumerState<FloorsPage> createState() => _FloorsPageState();
 }
 
-class _FloorsPageState extends ConsumerState<FloorsPage> {
+class _FloorsPageState extends ConsumerState<FloorsPage> with RefreshOnShow {
   bool _editing = false;
+
+  @override
+  void refreshOnShow() {
+    ref.invalidate(floorsProvider(widget.houseId));
+    ref.invalidate(houseProvider(widget.houseId));
+  }
 
   void _refresh() {
     ref.invalidate(floorsProvider(widget.houseId));
@@ -54,7 +61,12 @@ class _FloorsPageState extends ConsumerState<FloorsPage> {
 
   @override
   Widget build(BuildContext context) {
+    trackVisibility();
     final floorsAsync = ref.watch(floorsProvider(widget.houseId));
+    // Shared (non-owned) floors cannot be re-iconed.
+    final ownedIds = ref.watch(ownedLocationIdsProvider).value;
+    bool owns(String id) =>
+        id.startsWith('syn:') || (ownedIds?.contains(id) ?? false);
 
     return AppScaffold(
       header: AppHeader(
@@ -90,8 +102,8 @@ class _FloorsPageState extends ConsumerState<FloorsPage> {
                       subtitle:
                           '${floor.roomCount} Räume \u00b7 ${floor.deviceCount} Geräte',
                       accent: context.accent(floor.accentKey),
-                      showIconEditHint: _editing,
-                      onTap: _editing
+                      showIconEditHint: _editing && owns(floor.id),
+                      onTap: _editing && owns(floor.id)
                           ? () => _pickFloorIcon(floor)
                           : () => context.push(Paths.rooms(floor.id)),
                     ),

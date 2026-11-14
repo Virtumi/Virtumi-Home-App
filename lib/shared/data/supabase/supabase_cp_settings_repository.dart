@@ -84,18 +84,17 @@ class SupabaseCpSettingsRepository implements CpSettingsRepository {
   Future<List<CpParameterDeviceOption>> getSelectableDevices({
     required String excludeDeviceId,
   }) async {
-    final userId = requireUserId(_client);
+    // No user_id filter: RLS returns the user's own devices plus devices that
+    // other users shared with them.
+    requireUserId(_client);
 
-    final rows = await _client
-        .from('devices')
-        .select(
+    final rows = await _client.from('devices').select(
           'id, name, devicename, device_code, espnow_mac, ip_address, port, '
           'device_types!inner(name, room_id, '
           'rooms!inner(name, floor_id, '
           'floors!inner(name, home_id, '
           'homes!inner(name, user_id))))',
-        )
-        .eq('user_id', userId);
+        );
 
     final options = <CpParameterDeviceOption>[];
 
@@ -117,8 +116,6 @@ class SupabaseCpSettingsRepository implements CpSettingsRepository {
 
       final homes = floors['homes'];
       if (homes is! Map<String, dynamic>) continue;
-
-      if (homes['user_id'] != userId) continue;
 
       final homeName = homes['name'] as String? ?? 'Haus';
       final floorName = floors['name'] as String? ?? 'Etage';

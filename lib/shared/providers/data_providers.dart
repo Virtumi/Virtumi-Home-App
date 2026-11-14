@@ -1,7 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType;
 
 import '../../features/rooms/application/room_devices_controller.dart';
+import '../../core/auth/auth_providers.dart';
+import '../../core/services/local_notification_service.dart';
 import '../../core/supabase/realtime_guard.dart';
 import '../../core/supabase/realtime_service.dart';
 import '../../core/supabase/supabase_client.dart';
@@ -19,6 +25,7 @@ void refreshHomeScreenData(WidgetRef ref) {
   ref.invalidate(recentHomesProvider);
   ref.invalidate(recentActivityDevicesProvider);
   ref.invalidate(favoriteDevicesEntriesProvider);
+  ref.invalidate(notificationsProvider);
 }
 
 /// Invalidates all location-related providers so Home, floors, rooms and
@@ -32,12 +39,123 @@ void invalidateLocationHierarchy(WidgetRef ref, {String? deviceId}) {
   ref.invalidate(floorProvider);
   ref.invalidate(roomProvider);
   ref.invalidate(roomDevicesControllerProvider);
+  ref.invalidate(shareableTargetsProvider);
+  ref.invalidate(ownedLocationIdsProvider);
   ref.invalidate(recentActivityDevicesProvider);
   ref.invalidate(favoriteDevicesEntriesProvider);
   if (deviceId != null) {
     ref.invalidate(deviceProvider(deviceId));
   }
 }
+
+/// Shares the current user granted to other users.
+final mySharesProvider = FutureProvider<List<DeviceShare>>((ref) {
+  return ref.watch(sharingRepositoryProvider).listMyShares();
+});
+
+/// Shares other users granted to the current user.
+final sharedWithMeProvider = FutureProvider<List<DeviceShare>>((ref) {
+  return ref.watch(sharingRepositoryProvider).listSharedWithMe();
+});
+
+/// Notification inbox of the signed-in user (bell icon on the Home screen).
+///
+/// Refreshes itself when Supabase Realtime reports a change of the user's own
+/// `app_notifications` rows. The unread counter is NOT a derived provider on
+/// purpose: widgets select it directly (see [unreadNotificationCount]) so a
+/// burst of events can never rebuild a derived provider twice in one frame.
+final notificationsProvider = FutureProvider<List<AppNotification>>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  final userId = client.auth.currentUser?.id;
+  if (userId == null) return const <AppNotification>[];
+
+  if (useSupabaseRealtimeRef(ref)) {
+    final localNotifications = ref.read(localNotificationServiceProvider);
+    unawaited(localNotifications.ensureInitialized());
+
+    final channel = client
+        .channel('app-notifications-$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'app_notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            if (!ref.mounted) return;
+            if (payload.eventType == PostgresChangeEvent.insert) {
+              final row = payload.newRecord;
+              unawaited(
+                localNotifications.showInboxEntry(
+                  type: AppNotificationType.fromDb(row['type'] as String?),
+                  deviceName: (row['device_name'] as String?) ?? 'ein Gerät',
+                  notificationId: row['id'] as String?,
+                ),
+              );
+            }
+            ref.invalidateSelf();
+          },
+        )
+        .subscribe();
+    ref.onDispose(() => client.removeChannel(channel));
+  }
+
+  return ref.watch(deviceAccessRepositoryProvider).listNotifications();
+});
+
+/// Number of unread notifications in [notifications] (0 while loading).
+int unreadNotificationCount(AsyncValue<List<AppNotification>> notifications) {
+  return notifications.maybeWhen(
+    data: (items) => items.where((n) => !n.isRead).length,
+    orElse: () => 0,
+  );
+}
+
+/// A single access request (owner decision page).
+final deviceAccessRequestProvider =
+    FutureProvider.family<DeviceAccessRequest?, String>((ref, requestId) {
+  return ref.watch(deviceAccessRepositoryProvider).getRequest(requestId);
+});
+
+/// Own houses/floors/rooms/devices that can be shared.
+final shareableTargetsProvider = FutureProvider<List<ShareTarget>>((ref) {
+  return ref.watch(sharingRepositoryProvider).listShareableTargets();
+});
+
+/// Ids of all houses, floors, rooms and devices the current user owns.
+final ownedLocationIdsProvider = FutureProvider<Set<String>>((ref) async {
+  final targets = await ref.watch(shareableTargetsProvider.future);
+  final ids = <String>{};
+  void walk(ShareTarget node) {
+    ids.add(node.id);
+    node.children.forEach(walk);
+  }
+
+  targets.forEach(walk);
+  return ids;
+});
+
+/// Whether the current user owns the house/floor/room [id] (and may therefore
+/// rename, re-icon or restructure it). False while unknown.
+final isLocationOwnerProvider = Provider.family<bool, String>((ref, id) {
+  if (id.startsWith('syn:')) return true;
+  return ref.watch(ownedLocationIdsProvider).maybeWhen(
+        data: (ids) => ids.contains(id),
+        orElse: () => false,
+      );
+});
+
+/// Whether the current user is the original owner of the device [deviceId]
+/// (may delete it). False while the device is loading.
+final isDeviceOwnerProvider = Provider.family<bool, String>((ref, deviceId) {
+  final device = ref.watch(deviceProvider(deviceId)).value;
+  if (device == null) return false;
+  final userId = ref.watch(supabaseClientProvider).auth.currentUser?.id;
+  return device.isOwnedBy(userId);
+});
 
 /// All houses for the current account.
 final housesProvider = FutureProvider<List<House>>((ref) {
@@ -146,9 +264,11 @@ final currentUserProvider = FutureProvider<User>((ref) {
 
 /// App settings for the signed-in user.
 final appSettingsProvider = FutureProvider<AppSettings?>((ref) async {
-  final authUser = ref.watch(supabaseClientProvider).auth.currentUser;
-  if (authUser == null) return null;
-  return ref.watch(appSettingsRepositoryProvider).getSettings(authUser.id);
+  // Not watched on purpose: [AppSettingsBootstrap] invalidates this provider
+  // when the signed-in user changes (watching would rebuild it mid-build).
+  final userId = ref.read(authUserIdProvider);
+  if (userId == null) return null;
+  return ref.watch(appSettingsRepositoryProvider).getSettings(userId);
 });
 
 // --- Per-device configuration sections ---

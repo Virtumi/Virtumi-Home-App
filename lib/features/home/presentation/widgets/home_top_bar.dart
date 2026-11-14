@@ -14,11 +14,15 @@ class HomeTopBar extends StatelessWidget {
     required this.user,
     this.connection = 'Cloud',
     this.onNotifications,
+    this.unreadCount = 0,
   });
 
   final User user;
   final String connection;
   final VoidCallback? onNotifications;
+
+  /// Number of unread notifications shown as a badge on the bell (hidden at 0).
+  final int unreadCount;
 
   String get _greetingName {
     if (user.firstName.trim().isNotEmpty) return user.firstName.trim();
@@ -95,14 +99,83 @@ class HomeTopBar extends StatelessWidget {
               ],
             ),
           ),
-          NeumorphicIconButton(
-            icon: Symbols.notifications,
-            iconColor: context.colors.onSurfaceVariant,
-            size: 44,
+          _NotificationBell(
+            unreadCount: unreadCount,
             onPressed: onNotifications,
-            tooltip: 'Benachrichtigungen',
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Bell button with a badge for the number of unread notifications.
+class _NotificationBell extends StatelessWidget {
+  const _NotificationBell({required this.unreadCount, this.onPressed});
+
+  final int unreadCount;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasUnread = unreadCount > 0;
+    final badgeColor = context.palette.accentRed;
+    final badgeText = unreadCount > 9 ? '9+' : '$unreadCount';
+
+    return Semantics(
+      label: hasUnread
+          ? 'Benachrichtigungen, $unreadCount ungelesen'
+          : 'Benachrichtigungen',
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            NeumorphicIconButton(
+              icon: Symbols.notifications,
+              iconColor: hasUnread
+                  ? context.colors.primary
+                  : context.colors.onSurfaceVariant,
+              filled: hasUnread,
+              size: 44,
+              onPressed: onPressed,
+              tooltip: 'Benachrichtigungen',
+            ),
+            if (hasUnread)
+              Positioned(
+                top: -2,
+                right: -2,
+                child: IgnorePointer(
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      minWidth: 20,
+                      minHeight: 20,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: badgeColor,
+                      borderRadius: AppRadius.full,
+                      border: Border.all(
+                        color: context.colors.surface,
+                        width: 2,
+                      ),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: context.text.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

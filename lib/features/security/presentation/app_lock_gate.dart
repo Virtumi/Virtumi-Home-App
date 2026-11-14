@@ -145,7 +145,10 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     }
 
     final settings = ref.watch(appSettingsProvider).value;
-    final isLocked = ref.watch(isAppLockedProvider);
+    // Selected directly (no derived provider): the lock state can change
+    // several times within one frame on sign-out, and a derived Provider
+    // rebuilding twice per frame crashes in Riverpod.
+    final isLocked = ref.watch(appLockProvider.select((s) => s.isLocked));
     final hasLocalPin =
         ref.watch(hasLocalPinProvider(session?.user.id ?? '')).value ?? false;
 

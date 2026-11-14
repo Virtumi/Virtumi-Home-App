@@ -11,6 +11,7 @@ import '../../models/wizard_step.dart';
 import '../../services/ble_device_service.dart';
 import '../../services/network_info_service.dart';
 import 'steps/wizard_date_time_step.dart';
+import 'steps/wizard_device_claimed_step.dart';
 import 'steps/wizard_general_step.dart';
 import 'steps/wizard_location_step.dart';
 import 'steps/wizard_password_step.dart';
@@ -48,13 +49,15 @@ class _WizardStepContentState extends State<WizardStepContent> {
   @override
   void initState() {
     super.initState();
-    _passwordController =
-        TextEditingController(text: widget.state.devicePassword);
+    _passwordController = TextEditingController(
+      text: widget.state.devicePassword,
+    );
     _broadcastController = TextEditingController(
       text: widget.state.broadcastIp ?? NetworkInfoService.fallbackBroadcast,
     );
-    _portController =
-        TextEditingController(text: widget.state.targetPort.toString());
+    _portController = TextEditingController(
+      text: widget.state.targetPort.toString(),
+    );
     _ssidController = TextEditingController();
     _wifiPasswordController = TextEditingController();
     _manualIpController = TextEditingController();
@@ -112,26 +115,30 @@ class _WizardStepContentState extends State<WizardStepContent> {
       WizardStep.btWifi => _btWifiStep(),
       WizardStep.btWait => _btWaitStep(),
       WizardStep.btResolve => _btResolveStep(),
+      WizardStep.deviceClaimed => WizardDeviceClaimedStep(
+        state: widget.state,
+        controller: widget.controller,
+      ),
       WizardStep.location => WizardLocationStep(
-          state: widget.state,
-          controller: widget.controller,
-        ),
+        state: widget.state,
+        controller: widget.controller,
+      ),
       WizardStep.dateTime => WizardDateTimeStep(
-          state: widget.state,
-          controller: widget.controller,
-        ),
+        state: widget.state,
+        controller: widget.controller,
+      ),
       WizardStep.general => WizardGeneralStep(
-          state: widget.state,
-          controller: widget.controller,
-        ),
+        state: widget.state,
+        controller: widget.controller,
+      ),
       WizardStep.update => WizardUpdateStep(
-          state: widget.state,
-          controller: widget.controller,
-        ),
+        state: widget.state,
+        controller: widget.controller,
+      ),
       WizardStep.passwordOpt => WizardPasswordStep(
-          state: widget.state,
-          controller: widget.controller,
-        ),
+        state: widget.state,
+        controller: widget.controller,
+      ),
       WizardStep.supabase => _supabaseStep(),
       WizardStep.credentials => _credentialsStep(),
       WizardStep.done => _doneStep(),
@@ -165,7 +172,9 @@ class _WizardStepContentState extends State<WizardStepContent> {
         ),
         const SizedBox(height: AppSpacing.lg),
         FilledButton(
-          onPressed: widget.state.isBusy ? null : widget.controller.goToSearchType,
+          onPressed: widget.state.isBusy
+              ? null
+              : widget.controller.goToSearchType,
           child: const Text('Weiter'),
         ),
       ],
@@ -229,8 +238,10 @@ class _WizardStepContentState extends State<WizardStepContent> {
               ? null
               : () {
                   final port =
-                      (int.tryParse(_portController.text.trim()) ?? 6000)
-                          .clamp(1, 65535);
+                      (int.tryParse(_portController.text.trim()) ?? 6000).clamp(
+                        1,
+                        65535,
+                      );
                   widget.controller.scanLan(
                     broadcastIp: _broadcastController.text.trim(),
                     port: port,
@@ -278,8 +289,9 @@ class _WizardStepContentState extends State<WizardStepContent> {
           accent: AppColors.accentBlue,
         ),
         OutlinedButton.icon(
-          onPressed:
-              widget.state.isBusy ? null : widget.controller.startBleScan,
+          onPressed: widget.state.isBusy
+              ? null
+              : widget.controller.startBleScan,
           icon: const Icon(Symbols.search),
           label: const Text('Bluetooth scannen'),
         ),
@@ -292,8 +304,8 @@ class _WizardStepContentState extends State<WizardStepContent> {
                       isEmsStoredName(result.device.platformName)
                   ? emsDisplayName
                   : (result.device.platformName.isNotEmpty
-                      ? result.device.platformName
-                      : 'Unbekanntes Gerät'),
+                        ? result.device.platformName
+                        : 'Unbekanntes Gerät'),
             ),
             subtitle: Text(result.device.remoteId.str),
             onTap: widget.state.isBusy
@@ -328,9 +340,9 @@ class _WizardStepContentState extends State<WizardStepContent> {
           onPressed: widget.state.isBusy
               ? null
               : () => widget.controller.sendBleWifi(
-                    _ssidController.text.trim(),
-                    _wifiPasswordController.text,
-                  ),
+                  _ssidController.text.trim(),
+                  _wifiPasswordController.text,
+                ),
           child: const Text('WLAN senden'),
         ),
       ],
@@ -368,8 +380,9 @@ class _WizardStepContentState extends State<WizardStepContent> {
           accent: AppColors.accentBlue,
         ),
         FilledButton(
-          onPressed:
-              widget.state.isBusy ? null : widget.controller.resolveBleViaProtocol1,
+          onPressed: widget.state.isBusy
+              ? null
+              : widget.controller.resolveBleViaProtocol1,
           child: const Text('Geräteinfo per Bluetooth (Protokoll 1)'),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -432,8 +445,9 @@ class _WizardStepContentState extends State<WizardStepContent> {
         ],
         const SizedBox(height: AppSpacing.lg),
         FilledButton(
-          onPressed:
-              widget.state.isBusy ? null : widget.controller.saveToSupabase,
+          onPressed: widget.state.isBusy
+              ? null
+              : widget.controller.saveToSupabase,
           child: const Text('In Supabase speichern'),
         ),
       ],
@@ -456,9 +470,11 @@ class _WizardStepContentState extends State<WizardStepContent> {
           decoration: InputDecoration(
             labelText: 'Supabase-Account-Passwort',
             suffixIcon: IconButton(
-              icon: Icon(_obscureAccountPassword
-                  ? Symbols.visibility
-                  : Symbols.visibility_off),
+              icon: Icon(
+                _obscureAccountPassword
+                    ? Symbols.visibility
+                    : Symbols.visibility_off,
+              ),
               onPressed: () => setState(
                 () => _obscureAccountPassword = !_obscureAccountPassword,
               ),
@@ -470,8 +486,8 @@ class _WizardStepContentState extends State<WizardStepContent> {
           onPressed: widget.state.isBusy
               ? null
               : () => widget.controller.sendCredentials(
-                    _accountPasswordController.text,
-                  ),
+                  _accountPasswordController.text,
+                ),
           child: const Text('Anmeldedaten senden'),
         ),
       ],

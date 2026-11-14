@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/extensions/accent_resolver.dart';
 import '../../../core/navigation/app_routes.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/widgets/refresh_on_show.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../shared/application/location_breadcrumb.dart';
 import '../../../shared/models/models.dart';
@@ -23,8 +24,14 @@ class RoomsPage extends ConsumerStatefulWidget {
   ConsumerState<RoomsPage> createState() => _RoomsPageState();
 }
 
-class _RoomsPageState extends ConsumerState<RoomsPage> {
+class _RoomsPageState extends ConsumerState<RoomsPage> with RefreshOnShow {
   bool _editing = false;
+
+  @override
+  void refreshOnShow() {
+    ref.invalidate(roomsProvider(widget.floorId));
+    ref.invalidate(floorProvider(widget.floorId));
+  }
 
   void _refresh() {
     ref.invalidate(roomsProvider(widget.floorId));
@@ -54,7 +61,12 @@ class _RoomsPageState extends ConsumerState<RoomsPage> {
 
   @override
   Widget build(BuildContext context) {
+    trackVisibility();
     final roomsAsync = ref.watch(roomsProvider(widget.floorId));
+    // Shared (non-owned) rooms cannot be re-iconed.
+    final ownedIds = ref.watch(ownedLocationIdsProvider).value;
+    bool owns(String id) =>
+        id.startsWith('syn:') || (ownedIds?.contains(id) ?? false);
 
     return AppScaffold(
       header: AppHeader(
@@ -94,8 +106,8 @@ class _RoomsPageState extends ConsumerState<RoomsPage> {
                       title: room.name,
                       subtitle: '${room.deviceCount} Geräte',
                       accent: context.accent(room.accentKey),
-                      showIconEditHint: _editing,
-                      onTap: _editing
+                      showIconEditHint: _editing && owns(room.id),
+                      onTap: _editing && owns(room.id)
                           ? () => _pickRoomIcon(room)
                           : () => context.push(Paths.roomOverview(room.id)),
                     ),

@@ -25,8 +25,28 @@ class SupabaseAuthRepository implements AuthRepository {
   Future<void> signUp({
     required String email,
     required String password,
+    required String firstName,
+    required String lastName,
+    String phone = '',
+    String addressStreet = '',
+    String addressPostalCode = '',
+    String addressCity = '',
+    String addressCountry = 'Deutschland',
   }) async {
-    await _client.auth.signUp(email: email, password: password);
+    await _client.auth.signUp(
+      email: email,
+      password: password,
+      data: {
+        'first_name': firstName,
+        'last_name': lastName,
+        'full_name': '$firstName $lastName'.trim(),
+        'phone': phone,
+        'address_street': addressStreet,
+        'address_postal_code': addressPostalCode,
+        'address_city': addressCity,
+        'address_country': addressCountry,
+      },
+    );
   }
 
   @override
