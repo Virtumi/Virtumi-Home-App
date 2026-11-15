@@ -12,6 +12,7 @@ import '../../../shared/models/models.dart';
 import '../../../shared/providers/connection_mode_provider.dart';
 import '../../../shared/providers/data_providers.dart';
 import '../../../shared/providers/repository_providers.dart';
+import '../models/existing_device_change.dart';
 import '../models/wizard_found_device.dart';
 import '../models/wizard_step.dart';
 import '../repositories/device_setup_repository.dart';
@@ -79,14 +80,69 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
     }
   }
 
-  void _enterClaimedStep(
+  /// Compares the found [device] with the copy already stored in the own
+  /// account (IP address and place). Returns null when the comparison is not
+  /// possible: the wizard then falls back to the plain "already exists" hint.
+  Future<ExistingDeviceChange?> _buildExistingChange(
+    WizardFoundDevice device,
+    DeviceOwnerInfo info,
+  ) async {
+    try {
+      final stored = await _setup.loadOwnDeviceSnapshot(info.deviceId);
+
+      // The place reported by the device wins; discovery fields are only the
+      // fallback when the device does not answer the location request.
+      var found = DevicePlace(
+        home: device.home,
+        floor: device.floor,
+        room: device.room,
+      );
+      if (device.ipAddress.isNotEmpty) {
+        try {
+          final json = await _udp
+              .readLocation(
+                targetIp: device.ipAddress,
+                port: device.port,
+                deviceCode: state.devicePassword.trim(),
+              )
+              .timeout(const Duration(seconds: 4));
+          final loc = mapDeviceLocation(json);
+          final place = DevicePlace(
+            home: loc.houseName,
+            floor: loc.floorName,
+            room: loc.roomName,
+          );
+          if (!place.isEmpty) found = place;
+        } catch (_) {}
+      }
+
+      return ExistingDeviceChange(
+        deviceId: info.deviceId,
+        deviceName: info.deviceName,
+        storedIp: stored.ipAddress,
+        foundIp: device.ipAddress,
+        storedPlace: stored.place,
+        foundPlace: found,
+        storedPort: stored.port,
+        foundPort: device.port,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _enterClaimedStep(
     WizardFoundDevice device,
     DeviceOwnerInfo info,
     WizardStep previous,
-  ) {
+  ) async {
+    final change = info.isSelf ? await _buildExistingChange(device, info) : null;
     state = state.copyWith(
       selectedDevice: device,
       ownerInfo: info,
+      existingChange: change,
+      clearExistingChange: change == null,
+      existingUpdated: false,
       claimPreviousStep: previous,
       accessRequestSent: false,
       step: WizardStep.deviceClaimed,
@@ -94,6 +150,41 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
       isBusy: false,
       clearError: true,
     );
+  }
+
+  /// "Ja" on the claimed-device step of an own device: writes the changed IP
+  /// address and/or place of the found device to Supabase.
+  Future<void> confirmExistingDeviceUpdate() async {
+    final change = state.existingChange;
+    if (change == null || !change.hasChanges) return;
+
+    state = state.copyWith(isBusy: true, clearError: true);
+    try {
+      final type = state.selectedDevice?.devicetype.trim() ?? '';
+      await _setup.applyExistingDeviceChange(
+        change,
+        updateIp: change.ipChanged,
+        updateLocation: change.locationChanged,
+        deviceTypeName: isEmsTypeName(type)
+            ? emsStoredName
+            : (type.isNotEmpty ? type : 'Control Panel'),
+      );
+
+      ref.invalidate(housesProvider);
+      ref.invalidate(floorsProvider);
+      ref.invalidate(roomsProvider);
+      ref.invalidate(devicesProvider);
+      ref.invalidate(houseProvider);
+      ref.invalidate(floorProvider);
+      ref.invalidate(roomProvider);
+      ref.invalidate(deviceProvider(change.deviceId));
+      ref.invalidate(shareableTargetsProvider);
+      ref.invalidate(ownedLocationIdsProvider);
+
+      state = state.copyWith(existingUpdated: true, isBusy: false);
+    } catch (e) {
+      state = state.copyWith(isBusy: false, error: e.toString());
+    }
   }
 
   /// Option 1 on the claimed-device step: ask the owner for access.
@@ -279,7 +370,7 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
     state = state.copyWith(isBusy: true, clearError: true);
     final conflict = await _findOwnerConflict(device);
     if (conflict != null) {
-      _enterClaimedStep(device, conflict, WizardStep.lanScan);
+      await _enterClaimedStep(device, conflict, WizardStep.lanScan);
       return;
     }
 
@@ -387,7 +478,7 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
 
         final conflict = await _findOwnerConflict(device);
         if (conflict != null) {
-          _enterClaimedStep(device, conflict, WizardStep.btPick);
+          await _enterClaimedStep(device, conflict, WizardStep.btPick);
           return;
         }
 
@@ -437,7 +528,7 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
 
       final conflict = await _findOwnerConflict(device);
       if (conflict != null) {
-        _enterClaimedStep(device, conflict, WizardStep.btPick);
+        await _enterClaimedStep(device, conflict, WizardStep.btPick);
         return;
       }
 
@@ -472,7 +563,7 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
 
       final conflict = await _findOwnerConflict(device);
       if (conflict != null) {
-        _enterClaimedStep(device, conflict, WizardStep.btPick);
+        await _enterClaimedStep(device, conflict, WizardStep.btPick);
         return;
       }
 
@@ -514,7 +605,11 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
       if (selected.macAddress.trim() != _ownerCheckedMac) {
         final conflict = await _findOwnerConflict(selected);
         if (conflict != null) {
-          _enterClaimedStep(selected, conflict, state.locationPreviousStep);
+          await _enterClaimedStep(
+            selected,
+            conflict,
+            state.locationPreviousStep,
+          );
           return;
         }
       }
@@ -826,6 +921,8 @@ class NewDeviceWizardController extends Notifier<NewDeviceWizardState> {
         state = state.copyWith(
           step: state.claimPreviousStep,
           clearOwnerInfo: true,
+          clearExistingChange: true,
+          existingUpdated: false,
           accessRequestSent: false,
           clearError: true,
         );

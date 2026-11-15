@@ -2,7 +2,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_helpers.dart';
 import '../../../shared/models/models.dart';
+import '../models/existing_device_change.dart';
 import '../models/wizard_found_device.dart';
+
+/// Connection and place data of a device as stored in Supabase.
+class StoredDeviceData {
+  const StoredDeviceData({
+    required this.ipAddress,
+    required this.place,
+    this.port,
+  });
+
+  final String ipAddress;
+  final int? port;
+  final DevicePlace place;
+}
 
 class DeviceSetupRepository {
   DeviceSetupRepository(this._client);
@@ -152,6 +166,126 @@ class DeviceSetupRepository {
     }
 
     return deviceId;
+  }
+
+  /// IP, port and place currently stored in Supabase for an own device.
+  Future<StoredDeviceData> loadOwnDeviceSnapshot(String deviceId) async {
+    final row = await _client
+        .from('devices')
+        .select(
+          'ip_address, port, '
+          'device_types(rooms(name, floors(name, homes(name))))',
+        )
+        .eq('id', deviceId)
+        .maybeSingle();
+
+    var place = const DevicePlace();
+    final types = row?['device_types'];
+    final type = types is Map ? types : (types is List && types.isNotEmpty ? types.first : null);
+    final rooms = type is Map ? type['rooms'] : null;
+    if (rooms is Map) {
+      final floors = rooms['floors'];
+      final homes = floors is Map ? floors['homes'] : null;
+      place = DevicePlace(
+        home: homes is Map ? (homes['name'] as String? ?? '') : '',
+        floor: floors is Map ? (floors['name'] as String? ?? '') : '',
+        room: rooms['name'] as String? ?? '',
+      );
+    }
+
+    if (place.isEmpty) {
+      final dls = await _client
+          .from('device_location_settings')
+          .select('home, floor, room')
+          .eq('device_id', deviceId)
+          .maybeSingle();
+      if (dls != null) {
+        place = DevicePlace(
+          home: dls['home'] as String? ?? '',
+          floor: dls['floor'] as String? ?? '',
+          room: dls['room'] as String? ?? '',
+        );
+      }
+    }
+
+    return StoredDeviceData(
+      ipAddress: (row?['ip_address'] as String?) ?? '',
+      port: int.tryParse('${row?['port'] ?? ''}'),
+      place: place,
+    );
+  }
+
+  /// Writes the accepted changes of an already known device to Supabase.
+  Future<void> applyExistingDeviceChange(
+    ExistingDeviceChange change, {
+    required bool updateIp,
+    required bool updateLocation,
+    String deviceTypeName = 'Control Panel',
+  }) async {
+    final userId = requireUserId(_client);
+    final now = DateTime.now().toUtc().toIso8601String();
+    final deviceId = change.deviceId;
+
+    if (updateIp && change.foundIp.trim().isNotEmpty) {
+      await _client.from('devices').update({
+        'ip_address': change.foundIp.trim(),
+        if (change.foundPort != null) 'port': change.foundPort,
+        'updated_at': now,
+      }).eq('id', deviceId);
+    }
+
+    if (updateLocation && !change.foundPlace.isEmpty) {
+      final place = change.foundPlace;
+      final home = place.home.trim().isNotEmpty ? place.home.trim() : change.storedPlace.home;
+      final floor = place.floor.trim().isNotEmpty ? place.floor.trim() : change.storedPlace.floor;
+      final room = place.room.trim().isNotEmpty ? place.room.trim() : change.storedPlace.room;
+
+      final homeId = await _findOrCreateHome(userId, home, change.deviceName);
+      final floorId = await _findOrCreateFloor(homeId, floor, change.deviceName);
+      final roomId = await _findOrCreateRoom(floorId, room, change.deviceName);
+
+      final device = await _client
+          .from('devices')
+          .select('device_type_id')
+          .eq('id', deviceId)
+          .maybeSingle();
+      final typeId = device?['device_type_id'] as String?;
+
+      if (typeId != null) {
+        await _client
+            .from('device_types')
+            .update({'room_id': roomId, 'updated_at': now})
+            .eq('id', typeId);
+      } else {
+        final created = await _client
+            .from('device_types')
+            .insert({
+              'name': deviceTypeName,
+              'description': 'Device Type: $deviceTypeName in $room',
+              'icon': 'device',
+              'category': 'smart_device',
+              'room_id': roomId,
+              'created_at': now,
+              'updated_at': now,
+            })
+            .select('id')
+            .single();
+        await _client
+            .from('devices')
+            .update({'device_type_id': created['id'], 'updated_at': now})
+            .eq('id', deviceId);
+      }
+
+      await _client.from('device_location_settings').upsert({
+        'device_id': deviceId,
+        'user_id': userId,
+        'name': change.deviceName,
+        'home': home,
+        'floor': floor,
+        'room': room,
+        'updated_at': now,
+      }, onConflict: 'device_id');
+    }
   }
 
   Future<String> _findOrCreateHome(

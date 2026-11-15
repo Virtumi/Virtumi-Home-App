@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../../../shared/models/models.dart';
+import '../models/existing_device_change.dart';
 import '../models/wizard_found_device.dart';
 import '../models/wizard_step.dart';
 import '../services/ble_device_service.dart';
@@ -34,6 +35,8 @@ class NewDeviceWizardState {
     this.ownerInfo,
     this.claimPreviousStep = WizardStep.lanScan,
     this.accessRequestSent = false,
+    this.existingChange,
+    this.existingUpdated = false,
   });
 
   final WizardStep step;
@@ -69,6 +72,14 @@ class NewDeviceWizardState {
   /// True once an access request for [ownerInfo] was sent in this session.
   final bool accessRequestSent;
 
+  /// Differences between the found device and the copy already stored in the
+  /// own account (set together with an own [ownerInfo]). Null when the
+  /// comparison was not possible.
+  final ExistingDeviceChange? existingChange;
+
+  /// True once the accepted changes of [existingChange] were written.
+  final bool existingUpdated;
+
   String get targetIp => selectedDevice?.ipAddress ?? '';
 
   NewDeviceWizardState copyWith({
@@ -100,6 +111,9 @@ class NewDeviceWizardState {
     bool clearOwnerInfo = false,
     WizardStep? claimPreviousStep,
     bool? accessRequestSent,
+    ExistingDeviceChange? existingChange,
+    bool clearExistingChange = false,
+    bool? existingUpdated,
   }) {
     return NewDeviceWizardState(
       step: step ?? this.step,
@@ -130,6 +144,10 @@ class NewDeviceWizardState {
       ownerInfo: clearOwnerInfo ? null : (ownerInfo ?? this.ownerInfo),
       claimPreviousStep: claimPreviousStep ?? this.claimPreviousStep,
       accessRequestSent: accessRequestSent ?? this.accessRequestSent,
+      existingChange: clearExistingChange
+          ? null
+          : (existingChange ?? this.existingChange),
+      existingUpdated: existingUpdated ?? this.existingUpdated,
     );
   }
 }

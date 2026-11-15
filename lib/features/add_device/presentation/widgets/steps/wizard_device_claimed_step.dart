@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../../../core/navigation/app_routes.dart';
 import '../../../../../core/theme/theme.dart';
 import '../../../../../core/widgets/widgets.dart';
 import '../../../../../shared/models/models.dart';
 import '../../../application/new_device_wizard_controller.dart';
 import '../../../application/new_device_wizard_state.dart';
+import '../../../models/existing_device_change.dart';
 
 /// Shown when a discovered device already belongs to an account.
 ///
@@ -36,6 +39,28 @@ class WizardDeviceClaimedStep extends StatelessWidget {
     );
     final requestSent = state.accessRequestSent || info.hasPendingRequest;
 
+    // Own device: IP address / place of the found device vs. Supabase.
+    final change = info.isSelf ? state.existingChange : null;
+    final ipChanged = change?.ipChanged ?? false;
+    final locationChanged = change?.locationChanged ?? false;
+    final hasChanges = ipChanged || locationChanged;
+    final updated = state.existingUpdated;
+    final askToUpdate = hasChanges && !updated;
+
+    final String ownTitle;
+    if (updated) {
+      ownTitle = 'Gerät wurde aktualisiert';
+    } else if (ipChanged && locationChanged) {
+      ownTitle =
+          'Gerät existiert bereits, aber IP-Adresse und Ort haben sich geändert';
+    } else if (ipChanged) {
+      ownTitle = 'Gerät existiert bereits, aber die IP-Adresse hat sich geändert';
+    } else if (locationChanged) {
+      ownTitle = 'Gerät existiert bereits, aber in einem anderen Raum';
+    } else {
+      ownTitle = 'Gerät existiert bereits';
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -54,9 +79,7 @@ class WizardDeviceClaimedStep extends StatelessWidget {
                   const SizedBox(width: AppSpacing.gutter),
                   Expanded(
                     child: Text(
-                      info.isSelf
-                          ? 'Gerät ist bereits in deinem Konto'
-                          : 'Gerät ist bereits verknüpft',
+                      info.isSelf ? ownTitle : 'Gerät ist bereits verknüpft',
                       style: context.text.titleMedium,
                     ),
                   ),
@@ -65,8 +88,11 @@ class WizardDeviceClaimedStep extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               Text(
                 info.isSelf
-                    ? '„${info.deviceName}“ gehört schon zu deinem Konto und '
-                          'kann nicht erneut hinzugefügt werden.'
+                    ? (hasChanges || updated
+                          ? '„${info.deviceName}“ gehört schon zu deinem Konto '
+                                'und wird nicht erneut hinzugefügt.'
+                          : '„${info.deviceName}“ gehört schon zu deinem Konto '
+                                'und kann nicht erneut hinzugefügt werden.')
                     : 'Das Gerät „${info.deviceName}“ ist mit folgendem '
                           'Benutzer verknüpft:',
                 style: context.text.bodyMedium,
@@ -106,6 +132,32 @@ class WizardDeviceClaimedStep extends StatelessWidget {
             ],
           ),
         ),
+        if (change != null && askToUpdate) ...[
+          const SizedBox(height: AppSpacing.cardGap),
+          _ChangeQuestionCard(
+            change: change,
+            isBusy: state.isBusy,
+            onConfirm: controller.confirmExistingDeviceUpdate,
+            onDecline: controller.goBack,
+          ),
+        ],
+        if (updated && change != null) ...[
+          const SizedBox(height: AppSpacing.cardGap),
+          _InfoCard(
+            icon: Symbols.check_circle,
+            color: palette.accentGreen,
+            title: 'Änderungen übernommen',
+            text: [
+              if (ipChanged) 'Neue IP-Adresse: ${change.foundIp}',
+              if (locationChanged) 'Neuer Ort: ${change.foundPlace.label}',
+            ].join('\n'),
+          ),
+          const SizedBox(height: AppSpacing.cardGap),
+          FilledButton(
+            onPressed: () => context.go(Paths.home),
+            child: const Text('Zur Startseite'),
+          ),
+        ],
         if (info.alreadyShared && !info.isSelf) ...[
           const SizedBox(height: AppSpacing.cardGap),
           _InfoCard(
@@ -134,13 +186,117 @@ class WizardDeviceClaimedStep extends StatelessWidget {
                 'das Gerät in deinem Konto hinzufügen.',
           ),
         ],
-        const SizedBox(height: AppSpacing.lg),
-        OutlinedButton.icon(
-          onPressed: state.isBusy ? null : controller.goBack,
-          icon: const Icon(Symbols.arrow_back),
-          label: const Text('Zurück zur Geräteliste'),
-        ),
+        if (!askToUpdate && !updated) ...[
+          const SizedBox(height: AppSpacing.lg),
+          OutlinedButton.icon(
+            onPressed: state.isBusy ? null : controller.goBack,
+            icon: const Icon(Symbols.arrow_back),
+            label: const Text('Zurück zur Geräteliste'),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Question shown for an own device whose IP address and/or place differ from
+/// the data stored in Supabase.
+class _ChangeQuestionCard extends StatelessWidget {
+  const _ChangeQuestionCard({
+    required this.change,
+    required this.isBusy,
+    required this.onConfirm,
+    required this.onDecline,
+  });
+
+  final ExistingDeviceChange change;
+  final bool isBusy;
+  final VoidCallback onConfirm;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final ip = change.ipChanged;
+    final loc = change.locationChanged;
+
+    final String question;
+    final String confirmLabel;
+    if (ip && loc) {
+      question = 'IP-Adresse und Ort im vorhandenen Gerät aktualisieren?';
+      confirmLabel = 'Ja, aktualisieren';
+    } else if (ip) {
+      question = 'Soll die neue IP-Adresse im vorhandenen Gerät aktualisiert '
+          'werden?';
+      confirmLabel = 'Ja, aktualisieren';
+    } else {
+      question = 'Soll der neue Raum für dieses Gerät übernommen werden?';
+      confirmLabel = 'Ja, übernehmen';
+    }
+
+    Widget line(String label, String from, String to) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: context.text.labelMedium),
+            Text(
+              'Bisher: $from',
+              style: context.text.bodyMedium?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
+            Text('Neu: $to', style: context.text.bodyMedium),
+          ],
+        ),
+      );
+    }
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconBox(
+                icon: loc ? Symbols.meeting_room : Symbols.lan,
+                color: palette.accentOrange,
+                filled: true,
+              ),
+              const SizedBox(width: AppSpacing.gutter),
+              Expanded(
+                child: Text('Änderung erkannt', style: context.text.titleSmall),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (ip)
+            line(
+              'IP-Adresse',
+              change.storedIp.trim().isEmpty ? '-' : change.storedIp,
+              change.foundIp,
+            ),
+          if (loc)
+            line(
+              'Ort (Home / Etage / Raum)',
+              change.storedPlace.label,
+              change.foundPlace.label,
+            ),
+          Text(question, style: context.text.bodyMedium),
+          const SizedBox(height: AppSpacing.md),
+          FilledButton.icon(
+            onPressed: isBusy ? null : onConfirm,
+            icon: const Icon(Symbols.check, size: 20),
+            label: Text(confirmLabel),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          OutlinedButton(
+            onPressed: isBusy ? null : onDecline,
+            child: const Text('Nein'),
+          ),
+        ],
+      ),
     );
   }
 }
