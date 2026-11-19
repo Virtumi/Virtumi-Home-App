@@ -123,13 +123,10 @@ class _SmartLedEffectPickerSheetState extends State<_SmartLedEffectPickerSheet> 
                         ),
                         subtitle: effect.needsSecondaryColor
                             ? Text(
-                                'Nr. ${effect.number} · Sekundärfarbe',
+                                'Sekundärfarbe',
                                 style: context.text.bodySmall,
                               )
-                            : Text(
-                                'Nr. ${effect.number}',
-                                style: context.text.bodySmall,
-                              ),
+                            : null,
                         trailing: selected
                             ? Icon(Symbols.check_circle, color: primary, fill: 1)
                             : null,

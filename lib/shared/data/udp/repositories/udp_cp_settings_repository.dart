@@ -38,7 +38,7 @@ class UdpCpSettingsRepository implements CpSettingsRepository {
         targetIp: ip,
         port: port,
         deviceCode: deviceCode,
-        slotCommand: index + 1,
+        slotCommand: index,
       );
       return mapCpParameterFromUdp(json, index);
     } catch (_) {
@@ -84,7 +84,7 @@ class UdpCpSettingsRepository implements CpSettingsRepository {
         'protocol_nr': 13,
         'reply_protocol': 13,
         'code': ep.deviceCode,
-        'command': parameterIndex + 1,
+        'command': parameterIndex,
         'active': 0,
       },
     );

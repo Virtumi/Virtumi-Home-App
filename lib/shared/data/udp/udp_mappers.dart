@@ -312,6 +312,7 @@ CpParameter mapCpParameterFromUdp(Map<String, dynamic> json, int parameterIndex)
     mode: json['mode'] as int? ?? 1,
     macAddress: json['mac'] as String? ?? json['mac_address'] as String? ?? '',
     ipAddress: json['ip'] as String? ?? json['ip_address'] as String? ?? '',
+    port: json['port'] as int?,
     ipv6: json['ipv6'] as String? ?? '',
     channel: json['channel'] as int? ?? 1,
     name: json['name'] as String? ?? '',
@@ -342,7 +343,7 @@ Map<String, dynamic> cpParameterUdpWritePayload(
     'protocol_nr': 13,
     'reply_protocol': 13,
     'code': deviceCode,
-    'command': parameter.parameterIndex + 1,
+    'command': parameter.parameterIndex,
     'active': parameter.active,
     'init': parameter.init,
     'enabled': parameter.enabled,
@@ -350,10 +351,32 @@ Map<String, dynamic> cpParameterUdpWritePayload(
     'mac': parameter.macAddress,
     'ipv6': parameter.ipv6,
     'ip': parameter.ipAddress,
+    if (parameter.port != null) 'port': parameter.port,
     'channel': parameter.channel,
     'name': parameter.name,
-    'recource_name': parameter.resourceName,
+    'resource_name': parameter.resourceName,
     'device_code': parameter.code,
+    'device_type': parameter.deviceType,
+    'commands': [
+      {
+        'active': parameter.command0Active,
+        'exists': parameter.command0Exists,
+        'function': parameter.command0Function,
+        'protokol_nr': parameter.command0ProtokolNr,
+      },
+      {
+        'active': parameter.command1Active,
+        'exists': parameter.command1Exists,
+        'function': parameter.command1Function,
+        'protokol_nr': parameter.command1ProtokolNr,
+      },
+      {
+        'active': parameter.command2Active,
+        'exists': parameter.command2Exists,
+        'function': parameter.command2Function,
+        'protokol_nr': parameter.command2ProtokolNr,
+      },
+    ],
   };
 }
 

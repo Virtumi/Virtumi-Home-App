@@ -54,6 +54,15 @@ class _AppSettingsBootstrapState extends ConsumerState<AppSettingsBootstrap> {
     // Registered unconditionally: it must already exist when the user id
     // flips from null to a value (fresh login). Settings may have finished
     // loading before the settings listener below was registered.
+    // Invalidated here, not via ref.watch inside the parameter providers:
+    // a watch makes those providers invalidate themselves while TickerMode
+    // is still building, which Riverpod rejects.
+    ref.listen(connectionModeProvider, (previous, next) {
+      if (previous == null || previous == next) return;
+      ref.invalidate(cpParametersProvider);
+      ref.invalidate(cpActiveParametersProvider);
+    });
+
     ref.listen(authUserIdProvider, (previous, next) {
       // Logout: nothing to do. Invalidating on logout makes dependent
       // providers (e.g. isDirectConnectionProvider) rebuild twice within one
